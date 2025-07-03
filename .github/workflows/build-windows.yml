@@ -15,8 +15,15 @@ jobs:
     - name: Set up Python 3.8
       uses: actions/setup-python@v4
       with:
-        python-version: '3.8' #
+        python-version: '3.8'
 
     - name: Run the build script
       run: build_script.bat
       shell: cmd
+
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-executable
+        path: dist/
