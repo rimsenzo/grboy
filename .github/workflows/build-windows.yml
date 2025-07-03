@@ -12,11 +12,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python 3.12
+    - name: Set up Python 3.8
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
+        python-version: '3.8' # <--- 파이썬 버전을 3.8로 변경
 
-    - name: Run build script
+    - name: Run the build script
       run: build_script.bat
       shell: cmd
