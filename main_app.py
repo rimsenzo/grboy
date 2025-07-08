@@ -280,7 +280,7 @@ class ReviewAnalyzer:
                 continue
             review_embedding = model.encode(review, convert_to_tensor=True)
             best_category, highest_score = '기타', 0.0
-            for category, cat_embedding in category_embeddinggits.items():
+            for category, cat_embedding in category_embeddings.items():
                 cosine_scores = util.cos_sim(review_embedding, cat_embedding)
                 max_score = torch.max(cosine_scores).item()
                 if max_score > highest_score:
