@@ -1,5 +1,19 @@
+# 가상환경 폴더
 venv/
+.venv/
 
-test.py
+# PyInstaller 빌드 결과물
+dist/
+build/
+*.spec
 
- *.json
+# 파이썬 캐시 파일
+__pycache__/
+*.pyc
+
+# Google Cloud 인증 키 파일 (보안)
+*.json
+
+# JetBrains / VSCode 등 IDE 설정 파일
+.idea/
+.vscode/

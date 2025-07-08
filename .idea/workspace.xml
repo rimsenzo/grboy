@@ -7,7 +7,6 @@
     <list default="true" id="4a8c8e9a-9456-489f-958c-7550e11160d1" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_app.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_app.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,14 +50,20 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "PyConsoleConfigurable.Python 콘솔",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
-      <console-settings module-name="my-crawling-project" is-module-sdk="true" working-directory="$PROJECT_DIR$">
-        <option name="myUseModuleSdk" value="true" />
+      <console-settings module-name="my-crawling-project" sdk-home="$PROJECT_DIR$/venv/bin/python" working-directory="$PROJECT_DIR$">
+        <option name="sdk">
+          <Sdk />
+        </option>
+        <option name="mySdkHome" value="$PROJECT_DIR$/venv/bin/python" />
+        <option name="mySdk">
+          <Sdk />
+        </option>
         <option name="myModuleName" value="my-crawling-project" />
         <option name="myWorkingDirectory" value="$PROJECT_DIR$" />
       </console-settings>
@@ -144,7 +149,7 @@
       <workItem from="1751437381743" duration="7497000" />
       <workItem from="1751500336248" duration="21408000" />
       <workItem from="1751524348318" duration="36974000" />
-      <workItem from="1751933042145" duration="1959000" />
+      <workItem from="1751933042145" duration="5205000" />
     </task>
     <servers />
   </component>
@@ -179,7 +184,7 @@
     <SUITE FILE_PATH="coverage/my_crawling_project$git2.coverage" NAME="git2 커버리지 결과" MODIFIED="1751507671472" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$main_app2.coverage" NAME="main_app2 커버리지 결과" MODIFIED="1751934005222" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$dpv.coverage" NAME="dpv 커버리지 결과" MODIFIED="1751444762909" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/my_crawling_project$main_app.coverage" NAME="main_app 커버리지 결과" MODIFIED="1751934828510" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/my_crawling_project$main_app.coverage" NAME="main_app 커버리지 결과" MODIFIED="1751938253444" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$test.coverage" NAME="test 커버리지 결과" MODIFIED="1751610575266" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
