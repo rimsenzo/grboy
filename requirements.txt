@@ -1,0 +1,7 @@
+gspread
+google-auth
+google-search-results
+pandas
+requests
+sentence-transformers
+torch
