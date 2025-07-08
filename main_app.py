@@ -8,6 +8,20 @@ import os
 import time
 from collections import Counter
 
+import sys
+import os
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller가 임시 폴더를 만들고 그 경로를 _MEIPASS에 저장합니다.
+        base_path = sys._MEIPASS
+    except Exception:
+        # PyInstaller로 실행되지 않았을 경우, 현재 작업 디렉터리를 사용합니다.
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 # AI 모델 관련 라이브러리
 from sentence_transformers import SentenceTransformer, util
 import torch
@@ -69,6 +83,8 @@ class ReviewAnalyzer:
 
         # 1. 모든 변수를 미리 안전하게 초기화하여 NameError를 원천 차단합니다.
         key_path = self.paths.get('google_sheet_key_path')
+        final_key_path = resource_path(key_filename)
+        creds = Credentials.from_service_account_file(final_key_path, scopes=self.scopes)
         spreadsheet_id = self.paths.get('spreadsheet_id')
         spreadsheet_name = self.paths.get('spreadsheet_name')
         worksheet_name = self.paths.get('worksheet_name')
