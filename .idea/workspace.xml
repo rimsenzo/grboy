@@ -149,7 +149,7 @@
       <workItem from="1751437381743" duration="7497000" />
       <workItem from="1751500336248" duration="21408000" />
       <workItem from="1751524348318" duration="36974000" />
-      <workItem from="1751933042145" duration="5205000" />
+      <workItem from="1751933042145" duration="5884000" />
     </task>
     <servers />
   </component>
@@ -163,11 +163,6 @@
           <url>file://$PROJECT_DIR$/main_app.py</url>
           <line>652</line>
           <option name="timeStamp" value="2" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/main_app.py</url>
-          <line>31</line>
-          <option name="timeStamp" value="4" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

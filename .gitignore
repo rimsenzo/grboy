@@ -17,3 +17,6 @@ __pycache__/
 # JetBrains / VSCode 등 IDE 설정 파일
 .idea/
 .vscode/
+
+
+/Users/ezra/Desktop/my-crawling-project/main_app2.py
