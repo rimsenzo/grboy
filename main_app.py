@@ -20,6 +20,7 @@ from serpapi import GoogleSearch
 import gspread
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
+from googletrans import Translator
 
 
 # --- [핵심] .exe 환경을 위한 절대 경로 변환 함수 ---
@@ -41,6 +42,36 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 # ------------------- 백엔드 로직: ReviewAnalyzer 클래스 -------------------
 class ReviewAnalyzer:
+    from googletrans import Translator
+
+    def translate_reviews_to_korean(self, reviews):
+        print(f"--- [번역 시작] {len(reviews)}개의 리뷰를 한국어로 번역합니다. ---")
+        if not reviews:
+            return []
+
+        # [핵심 개선] 번역 전, 비어있거나(None) 텍스트가 아닌 항목을 완벽히 제거합니다.
+        valid_reviews = [review for review in reviews if review and isinstance(review, str)]
+
+        if not valid_reviews:
+            print("   ... 번역할 유효한 텍스트 리뷰가 없습니다.")
+            return []
+
+        print(f"   ... {len(valid_reviews)}개의 유효한 리뷰를 번역 대상으로 합니다.")
+
+        translator = Translator()
+        translated_reviews = []
+        try:
+            # 여러 리뷰를 한 번에 번역하여 효율성을 높입니다.
+            translations = translator.translate(valid_reviews, dest='ko')
+            for t in translations:
+                translated_reviews.append(t.text)
+            print(f"--- [번역 완료] 성공적으로 {len(translated_reviews)}개를 번역했습니다. ---")
+            return translated_reviews
+        except Exception as e:
+            print(f"오류: 리뷰 번역 중 오류 발생 - {e}")
+            # 번역 실패 시, 번역 가능한 원본 리뷰라도 반환하여 분석이 멈추지 않게 합니다.
+            return valid_reviews
+
     def __init__(self, api_keys, paths):
         # --- API 키와 경로 초기화 ---
         self.KOREA_TOUR_API_KEY = api_keys['korea_tour_api_key']
@@ -192,7 +223,7 @@ class ReviewAnalyzer:
         try:
             response = requests.get(url, params=params, headers={'accept': 'application/json'}, timeout=10)
             response.raise_for_status()
-            return [r['text'] for r in response.json().get('data', []) if 'text' in r]
+            return [r['text'] for r in response.json().get('data', []) if 'text' in r and r['text']]
         except Exception as e:
             print(f"오류: 트립어드바이저 리뷰 API 호출 중 - {e}")
             return []
@@ -249,7 +280,7 @@ class ReviewAnalyzer:
                 continue
             review_embedding = model.encode(review, convert_to_tensor=True)
             best_category, highest_score = '기타', 0.0
-            for category, cat_embedding in category_embeddings.items():
+            for category, cat_embedding in category_embeddinggits.items():
                 cosine_scores = util.cos_sim(review_embedding, cat_embedding)
                 max_score = torch.max(cosine_scores).item()
                 if max_score > highest_score:
@@ -587,6 +618,9 @@ class TouristApp(tk.Tk):
                 main_page.status_label.config(text="상태: 대기 중")
                 return
 
+            main_page.status_label.config(text="상태: 외국어 리뷰 번역 중...")
+            all_reviews = self.analyzer.translate_reviews_to_korean(all_reviews)
+
             main_page.status_label.config(text="상태: AI 모델로 리뷰 분류 중...")
             classified_reviews = self.analyzer.classify_reviews(
                 all_reviews,
@@ -922,6 +956,7 @@ class ReviewAnalyzer:
         print(f"\n--- Google에서 '{location_info['title']}'의 Place ID 검색 시작 ---")
         try:
             cleaned_title = location_info['title'].split('(')[0].strip()
+            print(f"🕵️  [최종 검색어 확인] q: \"{cleaned_title}, {location_info['addr1']}\"")
             params = {"engine": "google_maps", "q": f"{cleaned_title}, {location_info['addr1']}", "type": "search",
                       "hl": "ko", "api_key": self.SERPAPI_API_KEY}
             search = GoogleSearch(params)
