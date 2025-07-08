@@ -6,4 +6,3 @@ gspread
 pandas
 oauth2client
 pyinstaller
-googletrans==4.0.0-rc1

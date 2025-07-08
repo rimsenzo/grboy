@@ -23,37 +23,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # [핵심 수정] echo 대신 Python을 사용하여 Secret을 파일로 안전하게 생성합니다.
-      - name: Create credentials file from secret safely
-        shell: python
-        run: |
-          import os
-          import json
+      - name: Create credentials file from secret
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > serene-exchange-438319-r7-1dc9aac8b9cf.json
+        shell: bash
 
-          # GitHub Actions가 Secret을 환경 변수로 전달합니다.
-          credentials_json_string = os.environ.get('GOOGLE_CREDENTIALS')
-          
-          if not credentials_json_string:
-            raise ValueError("GOOGLE_CREDENTIALS secret is not set or empty.")
-          
-          # 파일에 쓰기 전에 유효한 JSON인지 다시 한번 확인합니다 (선택적이지만 안전함)
-          try:
-              json.loads(credentials_json_string)
-              print("Secret is a valid JSON. Writing to file...")
-          except json.JSONDecodeError as e:
-              print(f"Error: The provided secret is not a valid JSON. Please check the secret value in GitHub settings. Error: {e}")
-              # 처음 몇 글자만 출력하여 디버깅에 도움을 줍니다.
-              print(f"Secret starts with: {credentials_json_string[:100]}...")
-              raise
-          
-          with open('serene-exchange-438319-r7-1dc9aac8b9cf.json', 'w', encoding='utf-8') as f:
-              f.write(credentials_json_string)
-          
-          print("Credentials file created successfully.")
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-
-      # PowerShell의 줄바꿈 문법(`)을 사용합니다.
+      # [핵심] .spec 파일을 사용하지 않고, 모든 옵션을 여기에 직접 지정합니다.
       - name: Build single file executable
         run: |
           pyinstaller --onefile `
@@ -62,6 +36,7 @@ jobs:
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             main_app.py
+
 
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
