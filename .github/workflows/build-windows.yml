@@ -31,7 +31,8 @@ jobs:
         shell: bash
 
       - name: Build executable with .spec file
-        run: pyinstaller build.spec
+        run: pyinstaller --onefile build.spec
+
 
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
