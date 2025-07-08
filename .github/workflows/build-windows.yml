@@ -31,11 +31,11 @@ jobs:
       # [핵심] .spec 파일을 사용하지 않고, 모든 옵션을 여기에 직접 지정합니다.
       - name: Build single file executable
         run: |
-          pyinstaller --onefile ^
-            --name "TouristAnalyzer" ^
-            --windowed ^
-            --add-data "config.ini;." ^
-            --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." ^
+          pyinstaller --onefile `
+            --name "TouristAnalyzer" `
+            --windowed `
+            --add-data "config.ini;." `
+            --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             main_app.py
 
       - name: Upload executable artifact
