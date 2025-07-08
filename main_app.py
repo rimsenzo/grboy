@@ -793,7 +793,7 @@ class ReviewAnalyzer:
         # 1. 모든 변수를 미리 안전하게 초기화하여 NameError를 원천 차단합니다.
         key_path = self.paths.get('google_sheet_key_path')
         final_key_path = resource_path(key_filename)
-        creds = ServiceAccountCredentials.from_json_keyfile_name(final_key_path, scopes=self.scopes)
+        creds = ServiceAccountCredentials.from_service_account_file(final_key_path, scopes=self.scopes)
         spreadsheet_id = self.paths.get('spreadsheet_id')
         spreadsheet_name = self.paths.get('spreadsheet_name')
         worksheet_name = self.paths.get('worksheet_name')
@@ -802,7 +802,7 @@ class ReviewAnalyzer:
         try:
             # 2. 인증 정보를 생성합니다. (가장 흔한 오류 지점: FileNotFoundError)
             print("[1/5] Google API 인증을 시도합니다...")
-            creds = ServiceAccountCredentials.from_json_keyfile_name(key_path, scopes=self.scopes)
+            creds = ServiceAccountCredentials.from_service_account_file(key_path, scopes=self.scopes)
             gc = gspread.authorize(creds)
             print("  - 인증 성공.")
 
@@ -859,7 +859,7 @@ class ReviewAnalyzer:
         spreadsheet_name = self.paths.get('spreadsheet_name')
 
         try:
-            creds = ServiceAccountCredentials.from_json_keyfile_name(self.GOOGLE_SHEET_KEY_PATH, scopes=self.scopes)
+            creds = ServiceAccountCredentials.from_service_account_file(self.GOOGLE_SHEET_KEY_PATH, scopes=self.scopes)
             gc = gspread.authorize(creds)
 
             if spreadsheet_id:
