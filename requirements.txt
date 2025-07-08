@@ -1,7 +1,8 @@
-gspread
-google-auth
-google-search-results
-pandas
 requests
 sentence-transformers
 torch
+serpapi-google-search
+gspread
+pandas
+oauth2client
+pyinstaller
