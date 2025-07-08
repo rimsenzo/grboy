@@ -22,7 +22,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
 
       - name: Create credentials file from secret
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > serene-exchange-438319-r7-1dc9aac8b9cf.json
