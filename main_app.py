@@ -12,6 +12,8 @@ from collections import Counter
 from sentence_transformers import SentenceTransformer, util
 import torch
 
+import sys
+
 # serpapi 라이브러리
 from serpapi import GoogleSearch
 
@@ -28,28 +30,106 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 # ------------------- 백엔드 로직: ReviewAnalyzer 클래스 -------------------
 class ReviewAnalyzer:
     def __init__(self, api_keys, paths):
-        # API 키 초기화
+        # --- API 키와 경로 초기화 ---
         self.KOREA_TOUR_API_KEY = api_keys['korea_tour_api_key']
         self.TRIPADVISOR_API_KEY = api_keys['tripadvisor_api_key']
         self.SERPAPI_API_KEY = api_keys['serpapi_api_key']
 
-        # API URL 초기화
         self.KOREA_TOUR_API_URL = "http://apis.data.go.kr/B551011/KorService2/areaBasedList2"
         self.TRIPADVISOR_API_URL = "https://api.content.tripadvisor.com/api/v1"
 
-        # 경로 정보 저장
         self.paths = paths
         self.GOOGLE_SHEET_KEY_PATH = self.paths['google_sheet_key_path']
-        self.WORKSHEET_NAME =  self.paths['worksheet_name']
+        self.WORKSHEET_NAME = self.paths['worksheet_name']
         self.scopes = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive.file'
         ]
 
-        # 프로그램 시작 시 Google Sheet 데이터 로드
         self.company_df = self.get_company_data_from_sheet()
+
+        # --- 프로그램 시작 시 Google Sheet 데이터 로드 ---
+        self.company_df = self.get_company_data_from_sheet()
+
+        # --- 카테고리 정의 ---
+        self.CATEGORIES = {
+            '웰니스': ['힐링', '휴식', '스파', '사우나', '온천', '족욕', '마사지', '산책', '자연', '평화', '평온', '치유', '고요함', '명상', '건강'],
+            '뷰티': ['아름다운', '예쁜', '경치', '풍경', '뷰', '야경', '일몰', '노을', '포토존', '인생샷', '건축', '감성', '벚꽃', '파노라마'],
+            '교육': ['박물관', '미술관', '역사', '문화', '예술', '유물', '전시', '체험', '학습', '전통', '보존', '기념관', '건축', '템플스테이'],
+            '미식': ['맛집', '음식', '레스토랑', '카페', '해산물', '길거리 음식', '시장', '회', '조개구이', '돼지국밥', '씨앗호떡', '만두', '디저트'],
+            '역사': ['역사', '유적', '전통', '박물관', '사찰', '기념관', '고분', '삼국시대', '조선시대', '근현대사', 'APEC', '국제시장(영화)', '피난민'],
+            '한류': ['SNS', '인스타그램', '틱톡', '핫플레이스', '인기 명소', '부산국제영화제(BIFF)', 'K드라마', '영화 촬영지', '슬램덩크(애니메이션)'],
+            '해양': ['바다', '해변', '해수욕장', '해안', '항구', '섬', '등대', '요트', '해상케이블카', '스카이캡슐', '해변열차', '파도', '수족관', '스카이워크'],
+            '레포츠': ['레포츠', '액티비티', '스포츠', '루지', '하이킹', '산책', '둘레길', '조깅', '자전거', '요트', '서핑', '비치발리볼', '스카이스윙']
+        }
+
+    # --- 나머지 ReviewAnalyzer 메서드들 (get_company_data_from_sheet, recommend_companies 등)은 그대로 둡니다. ---
     def get_company_data_from_sheet(self):
-        # config.ini에서 고유 ID 또는 이름을 읽어옵니다. ID를 우선적으로 사용합니다.
+        print("\n--- [진단] get_company_data_from_sheet 함수 실행 시작 ---")
+
+        # 1. 모든 변수를 미리 안전하게 초기화하여 NameError를 원천 차단합니다.
+        key_path = self.paths.get('google_sheet_key_path')
+        spreadsheet_id = self.paths.get('spreadsheet_id')
+        spreadsheet_name = self.paths.get('spreadsheet_name')
+        worksheet_name = self.paths.get('worksheet_name')
+        df = pd.DataFrame()  # 기본값으로 빈 데이터프레임 설정
+
+        try:
+            # 2. 인증 정보를 생성합니다. (가장 흔한 오류 지점: FileNotFoundError)
+            print("[1/5] Google API 인증을 시도합니다...")
+            creds = Credentials.from_service_account_file(key_path, scopes=self.scopes)
+            gc = gspread.authorize(creds)
+            print("  - 인증 성공.")
+
+            # 3. 스프레드시트를 엽니다. (두 번째 흔한 오류 지점: SpreadsheetNotFound)
+            print("[2/5] 스프레드시트 열기를 시도합니다...")
+            if spreadsheet_id:
+                spreadsheet = gc.open_by_key(spreadsheet_id)
+            elif spreadsheet_name:
+                spreadsheet = gc.open(spreadsheet_name)
+            else:
+                messagebox.showerror("설정 오류", "config.ini에 spreadsheet_id 또는 spreadsheet_name이 없습니다.")
+                return df
+            print("  - 스프레드시트 열기 성공.")
+
+            # 4. 워크시트를 엽니다.
+            print(f"[3/5] '{worksheet_name}' 워크시트 열기를 시도합니다...")
+            worksheet = spreadsheet.worksheet(worksheet_name)
+            print("  - 워크시트 열기 성공.")
+
+            # 5. 모든 데이터를 가져옵니다.
+            print("[4/5] 워크시트의 모든 데이터를 가져옵니다...")
+            all_values = worksheet.get_all_values()
+            print("  - 데이터 가져오기 성공.")
+
+            if not all_values or len(all_values) < 2:
+                messagebox.showerror("데이터 없음", f"'{worksheet_name}' 시트에 헤더를 포함한 데이터가 없습니다.")
+                return df
+
+            headers = all_values[0]
+            data_rows = all_values[1:]
+            df = pd.DataFrame(data_rows, columns=headers)
+
+            print(f"[5/5] 성공적으로 {len(df)}개의 기업 데이터를 DataFrame으로 변환했습니다.")
+            print("\n--- [진단 완료] 데이터 로딩에 성공했습니다. ---")
+            return df
+
+        except FileNotFoundError:
+            error_msg = f"인증 키 파일을 찾을 수 없습니다.\n\nconfig.ini에 설정된 경로가 올바른지 확인해주세요:\n'{key_path}'"
+            messagebox.showerror("파일 없음 오류", error_msg)
+            return df
+
+        except gspread.exceptions.SpreadsheetNotFound:
+            error_msg = f"스프레드시트를 찾을 수 없습니다.\n\nID: '{spreadsheet_id}' 또는 이름: '{spreadsheet_name}'\n\n- ID/이름이 정확한지 확인하세요.\n- 서비스 계정이 해당 시트에 '편집자'로 공유되었는지 확인하세요."
+            messagebox.showerror("스프레드시트 없음 오류", error_msg)
+            return df
+
+        except Exception as e:
+            error_msg = f"예상치 못한 오류가 발생했습니다.\n\n오류 유형: {type(e).__name__}\n오류 내용: {e}"
+            messagebox.showerror("알 수 없는 오류", error_msg)
+            return df
+
+    def get_company_data_from_sheet(self):
         spreadsheet_id = self.paths.get('spreadsheet_id')
         spreadsheet_name = self.paths.get('spreadsheet_name')
 
@@ -58,10 +138,8 @@ class ReviewAnalyzer:
             gc = gspread.authorize(creds)
 
             if spreadsheet_id:
-                print(f"\n--- Google 스프레드시트 (ID: {spreadsheet_id})로 직접 접근 시도 ---")
                 spreadsheet = gc.open_by_key(spreadsheet_id)
             elif spreadsheet_name:
-                print(f"\n--- Google 스프레드시트 (이름: {spreadsheet_name})로 접근 시도 ---")
                 spreadsheet = gc.open(spreadsheet_name)
             else:
                 messagebox.showerror("설정 오류", "config.ini에 spreadsheet_id 또는 spreadsheet_name이 없습니다.")
@@ -69,31 +147,25 @@ class ReviewAnalyzer:
 
             worksheet = spreadsheet.worksheet(self.WORKSHEET_NAME)
 
-            # 중복 헤더 오류를 원천 방지하는 가장 좋은 방법
-            expected_headers = ['기업명', '사업내용', '평가']
-            data = worksheet.get_all_records(expected_headers=expected_headers)
+            print("\n[진단 시작] Google Sheets에서 최신 데이터를 강제로 로딩합니다.")
+            all_values = worksheet.get_all_values()
 
-            if not data:
-                messagebox.showerror("데이터 없음", f"'{self.WORKSHEET_NAME}' 시트에 필요한 데이터가 없습니다.")
+            if not all_values or len(all_values) < 2:
                 return pd.DataFrame()
 
-            df = pd.DataFrame(data)
-            print(f"   ... 성공! {len(df)}개의 기업 데이터를 로드했습니다.")
+            headers = all_values[0]
+            data_rows = all_values[1:]
+            df = pd.DataFrame(data_rows, columns=headers)
+
+            print(f"[진단 결과] 성공! {len(df)}개의 최신 데이터를 가져왔습니다.")
+
             return df
 
-        except gspread.exceptions.SpreadsheetNotFound:
-            messagebox.showerror("시트 찾기 오류",
-                                 f"스프레드시트 '{spreadsheet_name or spreadsheet_id}'를 찾을 수 없습니다.\n- 서비스 계정에 '편집자'로 공유되었는지 확인하세요.\n- config.ini의 정보가 올바른지 확인하세요.")
-            return pd.DataFrame()
-        except gspread.exceptions.WorksheetNotFound:
-            messagebox.showerror("워크시트 찾기 오류", f"시트 '{self.WORKSHEET_NAME}'를 찾을 수 없습니다.")
-            return pd.DataFrame()
-        except FileNotFoundError:
-            messagebox.showerror("JSON 키 파일 오류", f"지정한 경로에 키 파일이 없습니다:\n{self.GOOGLE_SHEET_KEY_PATH}")
-            return pd.DataFrame()
         except Exception as e:
-            messagebox.showerror("스프레드시트 오류", f"데이터 로드 중 오류 발생:\n{e}")
+            print(f"[진단 중 오류 발생] get_company_data_from_sheet: {e}")
+            messagebox.showerror("스프레드시트 오류", f"데이터 로드 중 오류가 발생했습니다:\n{e}")
             return pd.DataFrame()
+
 
     def recommend_companies(self, category):
         print(f"\n--- '{category}' 카테고리와 연관된 기업 추천 시작 ---")
@@ -233,39 +305,79 @@ class StartPage(tk.Frame):
 
 
 class CompanySearchPage(tk.Frame):
+
+    def refresh_list(self):
+        # 컨트롤러의 데이터 새로고침 함수를 호출합니다.
+        self.controller.refresh_company_data()
+
     def __init__(self, parent, controller):
         super().__init__(parent)
-        self.controller = controller
+        self.controller = controller  # <- controller는 여기에 있어야 합니다.
+
         header_frame = tk.Frame(self)
         header_frame.pack(fill='x', pady=10, padx=10)
         tk.Button(header_frame, text="< 시작 화면으로", command=lambda: controller.show_frame("StartPage")).pack(side='left')
+
+        # [추가] 새로고침 버튼을 헤더 오른쪽에 추가합니다.
+        tk.Button(header_frame, text="목록 새로고침 🔃", command=self.refresh_list).pack(side='right')
+
         tk.Label(self, text="기업을 선택하여 평가를 확인하세요", font=("AppleGothic", 18, "bold")).pack(pady=20)
+
+        # [추가] 새로고침 상태를 보여줄 라벨을 추가합니다.
+        self.status_label = tk.Label(self, text="")
+        self.status_label.pack(pady=2)
+
         self.company_var = tk.StringVar()
         self.company_combo = ttk.Combobox(self, textvariable=self.company_var, font=("AppleGothic", 14),
                                           state="readonly")
         self.company_combo.pack(pady=10, padx=20, fill='x')
         self.company_combo.bind("<<ComboboxSelected>>", self.show_company_review)
+
         text_frame = tk.Frame(self)
         text_frame.pack(pady=10, padx=20, fill='both', expand=True)
-        self.text_area = tk.Text(text_frame, wrap='word', font=("AppleGothic", 12), bg="#f0f0f0")
+        self.text_area = tk.Text(text_frame, wrap='word', font=("AppleGothic", 12), bg="#f0f0f0", fg='black')
         self.scrollbar = tk.Scrollbar(text_frame, command=self.text_area.yview)
         self.text_area.config(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side='right', fill='y')
         self.text_area.pack(side='left', fill='both', expand=True)
 
     def update_company_list(self):
+        """컨트롤러의 데이터를 기반으로 콤보박스 목록을 업데이트합니다."""
         company_df = self.controller.analyzer.company_df
         if not company_df.empty and '기업명' in company_df.columns:
-            self.company_combo['values'] = company_df['기업명'].tolist()
+            company_list = company_df['기업명'].tolist()
+            self.company_combo['values'] = company_list
+        else:
+            self.company_combo['values'] = []
+            # 목록이 비었을 경우 안내 문구를 추가할 수 있습니다.
+            self.text_area.config(state='normal')
+            self.text_area.delete(1.0, 'end')
+            self.text_area.insert('end', "불러올 기업 목록이 없습니다.")
+            self.text_area.config(state='disabled')
 
     def show_company_review(self, event=None):
         selected_company = self.company_var.get()
         company_df = self.controller.analyzer.company_df
-        review_text = company_df[company_df['기업명'] == selected_company]['평가'].iloc[0]
+
         self.text_area.config(state='normal')
         self.text_area.delete(1.0, 'end')
-        self.text_area.insert('end', review_text)
+
+        try:
+            # 필터링된 데이터에서 '평가' 내용을 가져옵니다.
+            review_text = company_df[company_df['기업명'] == selected_company]['평가'].iloc[0]
+
+            # 만약 데이터가 비어있다면(None, NaN) 안내 문구를 표시합니다.
+            if pd.isna(review_text) or str(review_text).strip() == '':
+                self.text_area.insert('end', "✅ 등록된 평가 정보가 없습니다.")
+            else:
+                self.text_area.insert('end', review_text)
+
+        except IndexError:
+            # 선택된 기업 정보가 없는 경우에 대한 예외 처리
+            self.text_area.insert('end', f"⚠️ '{selected_company}'에 대한 정보를 찾을 수 없습니다.")
+
         self.text_area.config(state='disabled')
+
 
 
 class TouristSearchPage(tk.Frame):
@@ -356,12 +468,12 @@ class ResultPage(tk.Frame):
         recommended_companies = result_data.get('recommended_companies', [])
         main_category = result_data.get('main_category', '없음')
         if recommended_companies:
-            reco_frame = ttk.LabelFrame(self.scrollable_frame, text=f"✨ '{main_category}' 연관 기업 추천", padding=10)
+            reco_frame = ttk.LabelFrame(self.scrollable_frame, text=f" 🏫'{main_category}' 연관 기업 추천", padding=10)
             reco_frame.pack(fill='x', padx=10, pady=10, anchor='n')
             reco_text = ", ".join(recommended_companies)
             tk.Label(reco_frame, text=reco_text, wraplength=550, justify='left').pack(anchor='w')
 
-        category_frame = ttk.LabelFrame(self.scrollable_frame, text="📊 카테고리별 리뷰 분석", padding=10)
+        category_frame = ttk.LabelFrame(self.scrollable_frame, text=" 💬관광지 리뷰 카테고리 분류 결과", padding=10)
         category_frame.pack(fill='x', padx=10, pady=10, anchor='n')
         category_counts = Counter(result['category'] for result in reviews)
         total_reviews = len(reviews)
@@ -437,7 +549,7 @@ class TouristApp(tk.Tk):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self.show_frame("StartPage")
-        self.load_initial_data()
+        self.load_initial_resources()
 
     def show_frame(self, page_name):
         if page_name == "CompanySearchPage":
@@ -447,18 +559,35 @@ class TouristApp(tk.Tk):
         frame = self.frames[page_name]
         frame.tkraise()
 
-    def load_initial_data(self):
-        threading.Thread(target=self._load_spots_thread, daemon=True).start()
+    def load_initial_resources(self):
+        threading.Thread(target=self._load_resources_thread, daemon=True).start()
 
-    def _load_spots_thread(self):
+    def _load_resources_thread(self):
         status_label = self.frames["TouristSearchPage"].status_label
+
+        # 1. 관광지 목록 로딩
         status_label.config(text="상태: 자동완성용 관광지 목록 로딩 중...")
         self.all_tourist_spots = self.analyzer.get_all_tourist_spots()
         spot_names = [spot['title'] for spot in self.all_tourist_spots]
         self.frames["TouristSearchPage"].update_autocomplete(spot_names)
-        status_label.config(text="상태: 대기 중")
+
+        # 2. AI 모델 및 임베딩 로딩
+        status_label.config(text="상태: AI 분석 모델 로딩 중...")
+        try:
+            self.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask')
+            self.category_embeddings = {cat: self.sbert_model.encode(kw, convert_to_tensor=True)
+                                        for cat, kw in self.analyzer.CATEGORIES.items()}
+            print("--- AI 모델 및 카테고리 임베딩 로딩 완료 ---")
+            status_label.config(text="상태: 대기 중")
+        except Exception as e:
+            print(f"AI 모델 로딩 실패: {e}")
+            messagebox.showerror("모델 로딩 오류", f"AI 모델을 로딩하는 데 실패했습니다.\n인터넷 연결을 확인하세요.\n\n오류: {e}")
+            status_label.config(text="상태: AI 모델 로딩 실패")
 
     def start_full_analysis(self, spot_name, max_reviews):
+        if not self.sbert_model:
+            messagebox.showerror("준비 안됨", "아직 AI 모델이 로딩되지 않았습니다. 잠시 후 다시 시도해주세요.")
+            return
         threading.Thread(target=self._analysis_thread, args=(spot_name, max_reviews), daemon=True).start()
 
     def _analysis_thread(self, spot_name, max_reviews):
@@ -476,7 +605,7 @@ class TouristApp(tk.Tk):
             ta_id = self.analyzer.search_tripadvisor_location_id(spot_name)
             ta_reviews = self.analyzer.get_tripadvisor_reviews(ta_id)
 
-            main_page.status_label.config(text="상태: 구글 정보 수집 중...")
+            main_page.status_label.config(text="상태: 구글맵 리뷰 수집 중...")
             google_place_id = self.analyzer.get_google_place_id(selected_spot_info)
             google_reviews = self.analyzer.get_google_reviews_via_serpapi(google_place_id,
                                                                           max_reviews) if google_place_id else []
@@ -488,19 +617,12 @@ class TouristApp(tk.Tk):
                 return
 
             main_page.status_label.config(text="상태: AI 모델로 리뷰 분류 중...")
-            model = SentenceTransformer('jhgan/ko-sroberta-multitask')
-            categories = {
-                '웰니스': ['힐링', '휴식', '스파', '사우나', '온천', '족욕', '마사지', '산책', '자연', '평화', '평온', '치유', '고요함', '명상', '건강'],
-                '뷰티': ['아름다운', '예쁜', '경치', '풍경', '뷰', '야경', '일몰', '노을', '포토존', '인생샷', '건축', '감성', '벚꽃', '파노라마'],
-                '교육': ['박물관', '미술관', '역사', '문화', '예술', '유물', '전시', '체험', '학습', '전통', '보존', '기념관', '건축', '템플스테이'],
-                '미식': ['맛집', '음식', '레스토랑', '카페', '해산물', '길거리 음식', '시장', '회', '조개구이', '돼지국밥', '씨앗호떡', '만두', '디저트'],
-                '역사': ['역사', '유적', '전통', '박물관', '사찰', '기념관', '고분', '삼국시대', '조선시대', '근현대사', 'APEC', '국제시장(영화)', '피난민'],
-                '한류': ['SNS', '인스타그램', '틱톡', '핫플레이스', '인기 명소', '부산국제영화제(BIFF)', 'K드라마', '영화 촬영지', '슬램덩크(애니메이션)'],
-                '해양': ['바다', '해변', '해수욕장', '해안', '항구', '섬', '등대', '요트', '해상케이블카', '스카이캡슐', '해변열차', '파도', '수족관',
-                       '스카이워크'],
-                '레포츠': ['레포츠', '액티비티', '스포츠', '루지', '하이킹', '산책', '둘레길', '조깅', '자전거', '요트', '서핑', '비치발리볼', '스카이스윙']}
-            category_embeddings = {cat: model.encode(kw, convert_to_tensor=True) for cat, kw in categories.items()}
-            classified_reviews = self.analyzer.classify_reviews(all_reviews, model, category_embeddings, 0.4)
+            classified_reviews = self.analyzer.classify_reviews(
+                all_reviews,
+                self.sbert_model,
+                self.category_embeddings,
+                0.4
+            )
 
             if not classified_reviews:
                 messagebox.showinfo("분석 불가", "리뷰의 카테고리를 분류할 수 없습니다.")
@@ -524,6 +646,31 @@ class TouristApp(tk.Tk):
             messagebox.showerror("분석 오류", f"분석 중 오류가 발생했습니다: {e}")
             self.frames["TouristSearchPage"].status_label.config(text="상태: 오류 발생")
 
+    def refresh_company_data(self):
+        """새로고침 기능을 별도 스레드에서 실행하도록 호출합니다."""
+        threading.Thread(target=self._refresh_company_thread, daemon=True).start()
+
+    def _refresh_company_thread(self):
+        company_page = self.frames["CompanySearchPage"]
+        currently_selected_company = company_page.company_var.get()
+
+        print(f"\n[진단] 새로고침 시작. 현재 선택된 기업: '{currently_selected_company}'")
+
+        new_company_df = self.analyzer.get_company_data_from_sheet()
+
+        if not new_company_df.empty:
+            self.analyzer.company_df = new_company_df
+            self.after(0, company_page.update_company_list)
+
+            print(f"[진단] UI 업데이트 시도. '{currently_selected_company}'를 다시 선택합니다.")
+            if currently_selected_company and currently_selected_company in new_company_df['기업명'].tolist():
+                self.after(0, lambda: company_page.company_var.set(currently_selected_company))
+                self.after(0, company_page.show_company_review)
+                print("[진단] UI 업데이트 명령 완료.")
+            else:
+                print("[진단] 이전에 선택된 기업이 없거나, 새 목록에 없어 평가를 업데이트하지 않습니다.")
+        else:
+            print("[진단] 새로 가져온 데이터가 비어있어 UI를 업데이트하지 않습니다.")
 
 # ------------------- 프로그램 시작점 -------------------
 if __name__ == "__main__":
