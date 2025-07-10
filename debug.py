@@ -1,65 +1,91 @@
-import configparser
-import os
-from serpapi import GoogleSearch
+import requests
+import json
+
+# --- 사용자 설정 ---
+# ※ 중요: 본인의 SerpApi API 키를 이곳에 입력해주세요.
+SERPAPI_API_KEY = "d7fd95ed11bc75bf6ab9b41c68229727066b6a3b5e73f1dc63b86796e62c9436"
+# 확인할 장소 이름
+PLACE_NAME = "밀락더마켓"
 
 
-def load_api_key():
+# --------------------------------------------------------------------------
+
+def check_reviews():
+    """
+    특정 장소의 리뷰 수집 과정을 단계별로 테스트하는 함수
+    1. 장소 이름으로 Place ID 검색
+    2. Place ID로 리뷰 데이터 요청
+    3. API 원본 응답 확인 및 결과 분석
+    """
+
+    if SERPAPI_API_KEY == "YOUR_SERPAPI_API_KEY":
+        print("!!! 오류: 코드를 실행하기 전에 SERPAPI_API_KEY를 본인의 키로 변경해주세요. !!!")
+        return
+
+    # --- 1단계: 장소 이름으로 Place ID 검색 ---
+    print(f"--- 1단계: '{PLACE_NAME}'의 Place ID 검색 시작 ---")
+    search_params = {
+        "engine": "google_maps",
+        "q": PLACE_NAME,
+        "api_key": SERPAPI_API_KEY
+    }
+
     try:
-        config = configparser.ConfigParser()
-        config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
-        if not config.read(config_path, encoding='utf-8'):
-            raise FileNotFoundError("config.ini 파일을 찾을 수 없습니다.")
-        return config.get('API_KEYS', 'serpapi_api_key')
-    except Exception as e:
-        print(f"오류: config.ini 파일에서 API 키를 읽는 데 실패했습니다. - {e}")
-        return None
+        search_response = requests.get("https://serpapi.com/search.json", params=search_params)
+        search_response.raise_for_status()  # HTTP 오류 발생 시 예외 처리
+        search_data = search_response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"!!! 1단계 오류: 장소 검색 API 요청에 실패했습니다. -> {e}")
+        return
 
+    place_id = search_data.get("place_results", {}).get("place_id")
 
-def get_google_place_info(api_key, location_name, location_address):
-    print(f"\n--- [1단계] '{location_name}'의 Place ID와 정보 검색 시작 ---")
-    search_query = f"{location_name}, {location_address}"
-    print(f"   - 검색어: \"{search_query}\"")
+    if place_id:
+        print(f"-> 성공: Place ID를 찾았습니다: {place_id}")
+        # 참고: '밀락더마켓'의 알려진 Place ID는 'ChIJcWnFpE2naDURw2Nb0o2wP3g' 입니다.
+        if place_id != "ChIJcWnFpE2naDURw2Nb0o2wP3g":
+            print("-> 경고: 알려진 Place ID와 다릅니다. 검색어가 부정확할 수 있습니다.")
+    else:
+        print("!!! 1단계 실패: Place ID를 찾을 수 없습니다.")
+        print("API 응답 원본:")
+        print(json.dumps(search_data, indent=2, ensure_ascii=False))
+        return  # Place ID가 없으면 다음 단계 진행 불가
+
+    print("\n" + "=" * 50 + "\n")
+
+    # --- 2단계: 찾은 Place ID로 리뷰 데이터 요청 ---
+    print(f"--- 2단계: Place ID '{place_id}'로 리뷰 요청 시작 ---")
+    reviews_params = {
+        "engine": "google_maps_reviews",
+        "place_id": place_id,
+        "api_key": SERPAPI_API_KEY
+    }
 
     try:
-        params = {"engine": "google_maps", "q": search_query, "type": "search", "hl": "ko", "api_key": api_key}
-        search = GoogleSearch(params)
-        results = search.get_dict()
+        reviews_response = requests.get("https://serpapi.com/search.json", params=reviews_params)
+        reviews_response.raise_for_status()
+        reviews_data = reviews_response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"!!! 2단계 오류: 리뷰 API 요청에 실패했습니다. -> {e}")
+        return
 
-        local_results = results.get("local_results", [])
-        if not local_results:
-            print("   - 결과: API 응답에 'local_results'가 없습니다. 장소를 찾지 못했습니다.")
-            return None
+    # --- 3단계: API 원본 응답 확인 및 최종 분석 ---
+    print("--- 3단계: 리뷰 API로부터 받은 원본 응답(Raw Data)입니다 ---")
+    print(json.dumps(reviews_data, indent=2, ensure_ascii=False))
 
-        found_place = local_results[0]
+    print("\n" + "=" * 50 + "\n")
+    print("--- 최종 분석 결과 ---")
 
-        # ⭐⭐⭐ 핵심 디버깅 출력: 구글이 실제로 찾아준 장소의 정보 ⭐⭐⭐
-        print("\n[구글맵 검색 결과]")
-        print(f"  - 찾은 장소 이름: {found_place.get('title')}")
-        print(f"  - 찾은 장소 주소: {found_place.get('address')}")
-        print(f"  - 찾은 장소 Place ID: {found_place.get('place_id')}")
-        # ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-
-        return found_place
-
-    except Exception as e:
-        print(f"오류: SerpApi로 Place ID 검색 중 오류 발생 - {e}")
-        return None
+    if "error" in reviews_data:
+        print(f"-> 문제 확인: API가 오류를 반환했습니다. 메시지: {reviews_data['error']}")
+    elif "reviews" in reviews_data and reviews_data["reviews"]:
+        review_count = len(reviews_data["reviews"])
+        print(f"-> 성공: {review_count}개의 리뷰를 정상적으로 가져왔습니다.")
+        print("-> 원인 추정: API는 정상입니다. 기존 프로젝트 코드에서 이 데이터를 처리(파싱, 필터링)하는 부분에 문제가 있을 가능성이 매우 높습니다.")
+    else:
+        print("-> 문제 확인: API가 리뷰 데이터를 반환하지 않았습니다. ('reviews' 키가 없거나 비어있음)")
+        print("-> 원인 추정: SerpApi 측에서 이 장소의 리뷰를 제공하지 않거나, 일시적인 API 문제일 수 있습니다.")
 
 
-# --- 메인 실행 코드 ---
 if __name__ == "__main__":
-    # 테스트할 관광지 정보 (실제 프로그램과 최대한 유사하게 구성)
-    tourist_spot_name = "감지해변"
-    # 한국관광공사 API가 제공했을 법한 상세 주소 (예시)
-    tourist_spot_address = "부산광역시 영도구 동삼동"
-
-    serp_api_key = load_api_key()
-
-    if serp_api_key:
-        # 1단계: 장소 정보를 가져옵니다.
-        place_info = get_google_place_info(serp_api_key, tourist_spot_name, tourist_spot_address)
-
-        if place_info:
-            print(f"\n[결론] '{tourist_spot_name}'으로 검색했지만, 실제로는 '{place_info.get('title')}'의 리뷰를 가져오게 됩니다.")
-        else:
-            print("\n[결론] Place ID를 찾지 못했습니다.")
+    check_reviews()
