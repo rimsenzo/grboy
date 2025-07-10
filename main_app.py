@@ -349,9 +349,64 @@ class ReviewAnalyzer:
                 {'review': review_text, 'source': review_data.get('source', '알 수 없음'), 'category': best_category})
         return classified_results
 
-    def recommend_companies(self, category):
-        if self.company_df.empty or '사업내용' not in self.company_df.columns: return []
-        return self.company_df[self.company_df['사업내용'].str.contains(category, na=False)]['기업명'].tolist()
+    def classify_all_companies(self, model, category_embeddings):
+        """
+        [신규] 모든 기업의 '사업내용'을 AI 모델로 분석하여 카테고리와 유사도 점수를 매깁니다.
+        이 함수는 프로그램 시작 시 한 번만 호출됩니다.
+        """
+        if self.company_df.empty or '사업내용' not in self.company_df.columns:
+            print("--- 기업 정보가 없어 분류를 건너뜁니다. ---")
+            return
+
+        print("\n--- 전체 기업 데이터 AI 기반 사전 분류 시작 ---")
+
+        # NaN 값을 빈 문자열로 대체하여 오류 방지
+        self.company_df['사업내용'] = self.company_df['사업내용'].fillna('')
+        business_texts = self.company_df['사업내용'].tolist()
+
+        # GPU/CPU 장치에 맞춰 텐서로 변환하여 계산
+        business_embeddings = model.encode(business_texts, convert_to_tensor=True)
+
+        categories = []
+        scores = []
+
+        # 각 사업내용과 카테고리 임베딩 간 유사도 계산
+        for emb in business_embeddings:
+            sim_scores = {cat: util.cos_sim(emb, cat_emb).max().item() for cat, cat_emb in category_embeddings.items()}
+
+            if not sim_scores:  # 유사도 계산 불가 시
+                categories.append('기타')
+                scores.append(0)
+                continue
+
+            best_cat = max(sim_scores, key=sim_scores.get)
+            best_score = sim_scores[best_cat]
+
+            categories.append(best_cat)
+            scores.append(best_score)
+
+        # 결과를 데이터프레임의 새 컬럼으로 추가
+        self.company_df['best_category'] = categories
+        self.company_df['category_score'] = scores
+
+        print(f"--- 기업 분류 완료: {len(self.company_df)}개 기업에 카테고리 및 점수 부여 완료 ---")
+
+    def recommend_companies(self, category, top_n=5):
+        """
+        [수정] 사전 분류된 기업 목록에서 특정 카테고리와 일치하는 기업을
+        유사도 점수가 높은 순으로 정렬하여 상위 n개를 추천합니다.
+        """
+        if self.company_df.empty or 'best_category' not in self.company_df.columns:
+            return []
+
+        # 해당 카테고리로 분류된 기업들을 필터링
+        recommended_df = self.company_df[self.company_df['best_category'] == category].copy()
+
+        # 'category_score' 기준으로 내림차순 정렬
+        recommended_df.sort_values(by='category_score', ascending=False, inplace=True)
+
+        # 상위 N개의 기업명만 리스트로 반환
+        return recommended_df.head(top_n)['기업명'].tolist()
 
 
 # ------------------- 프론트엔드 UI 페이지들 -------------------
@@ -372,7 +427,19 @@ class CompanySearchPage(tk.Frame):
 
         header_frame = tk.Frame(self)
         header_frame.pack(fill='x', pady=10, padx=10)
-        tk.Button(header_frame, text="< 시작 화면으로", command=lambda: controller.show_frame("StartPage")).pack(side='left')
+
+        # --- [수정] 왼쪽 내비게이션 버튼들을 담을 프레임 ---
+        left_nav_frame = tk.Frame(header_frame)
+        left_nav_frame.pack(side="left")
+
+        tk.Button(left_nav_frame, text="< 시작 화면으로", command=lambda: controller.show_frame("StartPage")).pack(
+            anchor='nw')
+
+        # --- [추가] '분석 결과로 돌아가기' 버튼 ---
+        tk.Button(left_nav_frame, text="< 분석 결과로 돌아가기",
+                  command=lambda: controller.show_frame("ResultPage")).pack(anchor='nw', pady=(5, 0))
+
+        # --- 오른쪽 '새로고침' 버튼 (기존과 동일) ---
         tk.Button(header_frame, text="목록 새로고침 🔃", command=self.refresh_list).pack(side='right')
 
         tk.Label(self, text="기업을 선택하여 평가를 확인하세요", font=("Helvetica", 18, "bold")).pack(pady=20)
@@ -385,7 +452,6 @@ class CompanySearchPage(tk.Frame):
         text_frame = tk.Frame(self)
         text_frame.pack(pady=10, padx=20, fill='both', expand=True)
 
-        # 이전에 수정했던 텍스트 색상 및 태그 설정은 그대로 유지합니다.
         self.text_area = tk.Text(text_frame, wrap='word', font=("Helvetica", 12), bg="#f0f0f0", fg="black")
         self.text_area.tag_configure("bold", font=("Helvetica", 12, "bold"))
         self.text_area.tag_configure("gray", foreground="gray")
@@ -402,6 +468,7 @@ class CompanySearchPage(tk.Frame):
 
         self.status_label = tk.Label(self, text="", font=("Helvetica", 10))
         self.status_label.pack(pady=(5, 0))
+
     def show_company_review(self, event=None):
         selected_company_name = self.company_var.get()
         if not selected_company_name: return
@@ -632,18 +699,33 @@ class ResultPage(tk.Frame):
         scrollbar.pack(side="right", fill="y")
 
     def update_results(self):
+        # 기존 위젯들을 모두 삭제
         for widget in self.scrollable_frame.winfo_children(): widget.destroy()
+
         result = self.controller.analysis_result
         self.title_label.config(text=f"'{result.get('spot_name', '')}' 분석 결과")
 
+        # --- [수정] 추천 기업 표시 로직 ---
         if result.get('recommended_companies'):
             reco_frame = ttk.LabelFrame(self.scrollable_frame, text=f"🏫 '{result.get('best_category')}' 연관 기업 추천",
                                         padding=10)
-            reco_frame.pack(fill='x', padx=10, pady=10)
-            tk.Label(reco_frame, text=", ".join(result['recommended_companies']), wraplength=550).pack(anchor='w')
+            reco_frame.pack(fill='x', padx=10, pady=10, anchor='n')
 
+            # 추천된 기업 목록을 하나씩 버튼으로 만듭니다.
+            for company_name in result['recommended_companies']:
+                # 클릭 가능한 링크처럼 보이도록 Label 위젯을 사용
+                company_link = tk.Label(reco_frame, text=f"  - {company_name}",
+                                        font=("Helvetica", 12, "underline"), fg="blue", cursor="hand2")
+                company_link.pack(anchor='w', pady=3)
+
+                # Label 클릭 시 컨트롤러의 새 함수를 호출하도록 바인딩
+                company_link.bind("<Button-1>",
+                                  lambda event, name=company_name: self.controller.show_company_details_from_result(
+                                      name))
+
+        # --- 카테고리 분류 결과 표시 로직 (기존과 동일) ---
         cat_frame = ttk.LabelFrame(self.scrollable_frame, text="💬 리뷰 카테고리 분류 결과", padding=10)
-        cat_frame.pack(fill='x', padx=10, pady=10)
+        cat_frame.pack(fill='x', padx=10, pady=10, anchor='n')
         category_counts = Counter(r['category'] for r in result['classified_reviews'])
         for category, count in category_counts.most_common():
             f = tk.Frame(cat_frame)
@@ -693,22 +775,26 @@ class DetailPage(tk.Frame):
 class TouristApp(tk.Tk):
     def __init__(self, api_keys, paths):
         super().__init__()
-        self.title("관광-기업 연계 분석기");
+        self.withdraw()  # [추가] 메인 윈도우를 초기에 숨깁니다.
+
+        self.title("관광-기업 연계 분석기")
         self.geometry("800x650")
         font.nametofont("TkDefaultFont").configure(family="Helvetica", size=12)
 
-        # [핵심 추가] GPU 사용 가능 여부를 확인하여 장치를 동적으로 설정합니다.
+        # [핵심] 로딩 팝업 생성 및 표시
+        self.create_loading_popup()
+
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"--- 실행 장치(Device)가 '{self.device}'로 설정되었습니다. ---")
 
         self.analyzer = ReviewAnalyzer(api_keys, paths)
-        self.sbert_model = None;
-        self.category_embeddings = None;
+        self.sbert_model = None
+        self.category_embeddings = None
         self.analysis_result = {}
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
-        container.grid_rowconfigure(0, weight=1);
+        container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
@@ -720,6 +806,57 @@ class TouristApp(tk.Tk):
         self.show_frame("StartPage")
         self.load_initial_resources()
 
+    def create_loading_popup(self):
+        """로딩 상태를 보여주는 팝업 Toplevel 창을 생성하고 중앙에 배치합니다."""
+        self.loading_popup = tk.Toplevel(self)
+        self.loading_popup.title("로딩 중")
+        self.loading_popup.resizable(False, False)
+        self.loading_popup.protocol("WM_DELETE_WINDOW", lambda: None)  # 닫기 버튼 비활성화
+        self.loading_popup.transient(self)
+        self.loading_popup.grab_set()
+
+        popup_width = 400
+        popup_height = 150
+        x = (self.winfo_screenwidth() // 2) - (popup_width // 2)
+        y = (self.winfo_screenheight() // 2) - (popup_height // 2)
+        self.loading_popup.geometry(f'{popup_width}x{popup_height}+{x}+{y}')
+
+        tk.Label(self.loading_popup, text="프로그램을 준비하고 있습니다...", font=("Helvetica", 14, "bold")).pack(pady=20)
+        self.loading_status_label = tk.Label(self.loading_popup, text="초기화 중...", font=("Helvetica", 10))
+        self.loading_status_label.pack(pady=5)
+        self.loading_progress_bar = ttk.Progressbar(self.loading_popup, orient='horizontal', length=300,
+                                                    mode='determinate')
+        self.loading_progress_bar.pack(pady=10)
+
+    def close_loading_popup(self):
+        """로딩 팝업을 닫고 메인 애플리케이션 창을 보여줍니다."""
+        if hasattr(self, 'loading_popup') and self.loading_popup:
+            self.loading_popup.grab_release()
+            self.loading_popup.destroy()
+        self.deiconify()  # 숨겨뒀던 메인 창을 표시
+        self.lift()
+        self.focus_force()
+
+    def show_company_details_from_result(self, company_name):
+        """
+        [신규] 결과 페이지에서 클릭된 기업의 상세 정보를 기업 검색 페이지에 표시합니다.
+        """
+        print(f"--- '{company_name}'의 상세 정보 페이지로 이동합니다. ---")
+
+        # 1. 기업 검색 페이지 프레임을 가져옵니다.
+        company_page = self.frames["CompanySearchPage"]
+
+        # 2. 해당 페이지의 콤보박스 변수 값을 클릭된 기업 이름으로 설정합니다.
+        company_page.company_var.set(company_name)
+
+        # 3. 기업 검색 페이지를 화면 맨 앞으로 가져옵니다.
+        company_page.tkraise()
+
+        # 4. 설정된 기업 이름에 해당하는 리뷰를 표시하도록 수동으로 함수를 호출합니다.
+        #    (콤보박스 값을 코드로 바꾸면 자동으로 이벤트가 발생하지 않기 때문입니다.)
+        company_page.show_company_review()
+
+
     def show_frame(self, page_name):
         frame = self.frames[page_name]
         if page_name == "CompanySearchPage": frame.update_company_list()
@@ -730,24 +867,37 @@ class TouristApp(tk.Tk):
         threading.Thread(target=self._load_resources_thread, daemon=True).start()
 
     def _load_resources_thread(self):
-        page = self.frames["TouristSearchPage"]
-        page.status_label.config(text="상태: 자동완성용 관광지 목록 로딩 중...")
-        all_spots = self.analyzer.get_tourist_spots_in_busan()
-        self.after(0, page.update_autocomplete_list, all_spots)
+        """백그라운드에서 리소스를 로드하고 로딩 팝업의 상태를 업데이트합니다."""
+        total_steps = 3  # 1. 관광지 목록, 2. AI 모델, 3. 기업 분류
 
-        page.status_label.config(text=f"상태: AI 분석 모델 로딩 중... (장치: {self.device})")
+        def update_popup(progress, message):
+            self.loading_progress_bar['value'] = progress
+            self.loading_status_label.config(text=message)
+
         try:
-            # [수정] __init__에서 동적으로 결정된 self.device를 사용하여 모델을 로드합니다.
-            self.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask', device=self.device)
+            # 1단계: 관광지 목록 로딩
+            self.after(0, update_popup, 20, "자동완성용 관광지 목록 로딩 중...")
+            all_spots = self.analyzer.get_tourist_spots_in_busan()
+            self.frames["TouristSearchPage"].update_autocomplete_list(all_spots)
 
-            # 모델과 동일한 장치를 사용하여 카테고리 임베딩을 생성합니다.
+            # 2단계: AI 모델 로딩
+            self.after(0, update_popup, 50, f"AI 분석 모델 로딩 중... (장치: {self.device})")
+            self.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask', device=self.device)
             self.category_embeddings = {cat: self.sbert_model.encode(kw, convert_to_tensor=True) for cat, kw in
                                         self.analyzer.CATEGORIES.items()}
-
             print("--- AI 모델 및 카테고리 임베딩 로딩 완료 ---")
-            page.status_label.config(text="상태: 대기 중")
+
+            # 3단계: 기업 정보 AI 기반 분류
+            self.after(0, update_popup, 80, "기업 정보 분석 및 분류 중...")
+            self.analyzer.classify_all_companies(self.sbert_model, self.category_embeddings)
+
+            self.after(0, update_popup, 100, "준비 완료!")
+            self.after(500, self.close_loading_popup)  # 0.5초 후 팝업 닫기
+
         except Exception as e:
-            messagebox.showerror("모델 로딩 오류", f"AI 모델 로딩에 실패했습니다.\n\n오류: {e}")
+            self.after(0, self.close_loading_popup)  # 오류 발생 시에도 팝업은 닫기
+            messagebox.showerror("초기화 오류", f"프로그램 준비 중 오류가 발생했습니다.\n\n오류: {e}")
+            self.destroy()  # 치명적 오류 시 프로그램 종료
 
     def start_full_analysis(self, spot_name, review_count):
         if not self.sbert_model:
