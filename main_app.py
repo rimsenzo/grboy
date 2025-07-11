@@ -21,7 +21,6 @@ import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-# --- [핵심] .exe 환경을 위한 절대 경로 변환 함수 ---
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
@@ -775,18 +774,16 @@ class DetailPage(tk.Frame):
 class TouristApp(tk.Tk):
     def __init__(self, api_keys, paths):
         super().__init__()
-        self.withdraw()  # [추가] 메인 윈도우를 초기에 숨깁니다.
+        self.withdraw()  # 메인 윈도우를 초기에 숨깁니다.
 
         self.title("관광-기업 연계 분석기")
         self.geometry("800x650")
         font.nametofont("TkDefaultFont").configure(family="Helvetica", size=12)
 
-        # [핵심] 로딩 팝업 생성 및 표시
-        self.create_loading_popup()
-
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"--- 실행 장치(Device)가 '{self.device}'로 설정되었습니다. ---")
 
+        # --- [수정 1] 리소스 로딩은 init에서 나중에 하므로, Analyzer는 먼저 생성합니다. ---
         self.analyzer = ReviewAnalyzer(api_keys, paths)
         self.sbert_model = None
         self.category_embeddings = None
@@ -804,6 +801,16 @@ class TouristApp(tk.Tk):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self.show_frame("StartPage")
+
+        # --- [핵심 수정] ---
+        # __init__에서는 리소스 로딩을 직접 호출하지 않고,
+        # mainloop가 시작된 직후(100ms 후)에 실행되도록 예약합니다.
+        # 이렇게 하면 GUI가 먼저 화면에 그려질 시간을 확보할 수 있습니다.
+        self.after(100, self.start_loading_process)
+
+    def start_loading_process(self):
+        """로딩 팝업을 만들고 백그라운드에서 리소스 로딩을 시작합니다."""
+        self.create_loading_popup()
         self.load_initial_resources()
 
     def create_loading_popup(self):
@@ -811,7 +818,7 @@ class TouristApp(tk.Tk):
         self.loading_popup = tk.Toplevel(self)
         self.loading_popup.title("로딩 중")
         self.loading_popup.resizable(False, False)
-        self.loading_popup.protocol("WM_DELETE_WINDOW", lambda: None)  # 닫기 버튼 비활성화
+        self.loading_popup.protocol("WM_DELETE_WINDOW", lambda: None)
         self.loading_popup.transient(self)
         self.loading_popup.grab_set()
 
@@ -828,14 +835,20 @@ class TouristApp(tk.Tk):
                                                     mode='determinate')
         self.loading_progress_bar.pack(pady=10)
 
+        # 팝업 창이 즉시 업데이트되도록 강제
+        self.loading_popup.update_idletasks()
+
     def close_loading_popup(self):
         """로딩 팝업을 닫고 메인 애플리케이션 창을 보여줍니다."""
-        if hasattr(self, 'loading_popup') and self.loading_popup:
+        if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
             self.loading_popup.grab_release()
             self.loading_popup.destroy()
-        self.deiconify()  # 숨겨뒀던 메인 창을 표시
+        self.deiconify()
         self.lift()
         self.focus_force()
+
+    def load_initial_resources(self):
+        threading.Thread(target=self._load_resources_thread, daemon=True).start()
 
     def show_company_details_from_result(self, company_name):
         """
@@ -856,15 +869,11 @@ class TouristApp(tk.Tk):
         #    (콤보박스 값을 코드로 바꾸면 자동으로 이벤트가 발생하지 않기 때문입니다.)
         company_page.show_company_review()
 
-
     def show_frame(self, page_name):
         frame = self.frames[page_name]
         if page_name == "CompanySearchPage": frame.update_company_list()
         if page_name == "ResultPage": frame.update_results()
         frame.tkraise()
-
-    def load_initial_resources(self):
-        threading.Thread(target=self._load_resources_thread, daemon=True).start()
 
     def _load_resources_thread(self):
         """백그라운드에서 리소스를 로드하고 로딩 팝업의 상태를 업데이트합니다."""
