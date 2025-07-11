@@ -964,9 +964,6 @@ class TouristApp(tk.Tk):
         self.loading_popup.protocol("WM_DELETE_WINDOW", lambda: None)
         self.loading_popup.transient(self)
         self.loading_popup.grab_set()
-        self.loading_popup.attributes('-topmost', True)
-        self.loading_popup.wait_visibility()
-        self.loading_popup.update_idletasks()
 
         popup_width = 400
         popup_height = 150
