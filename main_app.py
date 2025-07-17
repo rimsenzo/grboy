@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, font
+from tkinter import ttk, messagebox, font, filedialog
 import threading
 import requests
 import json
@@ -38,7 +38,7 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 # ------------------- 백엔드 로직: ReviewAnalyzer 클래스 -------------------
 class ReviewAnalyzer:
     def __init__(self, api_keys, paths):
-        # --- [수정 없음] API 키 및 경로 초기화 ---
+        # --- API 키 및 경로 초기화 (오류 없는 정상적인 코드) ---
         self.KOREA_TOUR_API_KEY = api_keys['korea_tour_api_key']
         self.TRIPADVISOR_API_KEY = api_keys['tripadvisor_api_key']
         self.SERPAPI_API_KEY = api_keys['serpapi_api_key']
@@ -48,32 +48,25 @@ class ReviewAnalyzer:
         self.GOOGLE_SHEET_KEY_FILENAME = self.paths['google_sheet_key_path']
         self.scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
-        # --- [수정] 데이터 로딩 시 클래스 변수로 직접 할당 ---
+        # --- 데이터프레임 초기화 및 로딩 ---
         self.company_df = pd.DataFrame()
         self.review_df = pd.DataFrame()
-        self.preference_df = pd.DataFrame()  # '선호분야' 데이터프레임 추가
-        self.get_company_data_from_sheet()  # 메서드를 호출하여 위 변수들을 채웁니다.
+        self.preference_df = pd.DataFrame()
+        self.get_company_data_from_sheet()
 
-        # --- [수정 없음] 카테고리 정의 ---
+        # --- 카테고리 정의 ---
         self.CATEGORIES = {
             'K-문화': ['K팝', 'K드라마', '영화 촬영지', '한류', '부산국제영화제', 'BIFF', '아이돌', '팬미팅', 'SNS', '인스타그램', '핫플레이스', '슬램덩크'],
-            '해양': ['바다', '해변', '해수욕장', '해안', '항구', '섬', '등대', '요트', '해상케이블카', '스카이캡슐', '해변열차', '파도', '수족관', '서핑',
-                   '스카이워크'],
+            '해양': ['바다', '해변', '해수욕장', '해안', '항구', '섬', '등대', '요트', '해상케이블카', '스카이캡슐', '해변열차', '파도', '수족관', '서핑', '스카이워크'],
             '웰니스': ['힐링', '휴식', '스파', '사우나', '온천', '족욕', '마사지', '산책', '자연', '평화', '평온', '치유', '고요함', '명상', '건강'],
-            '뷰티': ['미용', '헤어', '피부', '메이크업', '네일', '에스테틱', '피부관리', '뷰티서비스', '마사지', '미용실', '헤어샵', '네일샵', '살롱', '화장품',
-                   'K-뷰티', '퍼스널컬러', '스타일링', '시술', '페이셜'],
+            '뷰티': ['미용', '헤어', '피부', '메이크업', '네일', '에스테틱', '피부관리', '뷰티서비스', '마사지', '미용실', '헤어샵', '네일샵', '살롱', '화장품', 'K-뷰티', '퍼스널컬러', '스타일링', '시술', '페이셜'],
             'e스포츠': ['e스포츠', '게임', 'PC방', '대회', '경기장', '프로게이머', '리그오브레전드', 'LCK', '스타크래프트', '페이커', '이스포츠'],
             '미식': ['맛집', '음식', '레스토랑', '카페', '해산물', '음식', '시장', '회', '조개구이', '돼지국밥', '디저트', '식도락']
         }
 
     def get_company_data_from_sheet(self):
-        """
-        [핵심 수정] gspread의 get_all_records() 대신 get_all_values()를 사용하여,
-        헤더에 빈 열이 있어도 오류 없이 데이터를 로딩합니다.
-        """
         MAX_RETRIES = 3
         RETRY_DELAY = 5
-
         for attempt in range(MAX_RETRIES):
             try:
                 creds = ServiceAccountCredentials.from_json_keyfile_name(resource_path(self.GOOGLE_SHEET_KEY_FILENAME),
@@ -81,55 +74,247 @@ class ReviewAnalyzer:
                 gc = gspread.authorize(creds)
                 spreadsheet = gc.open(self.paths['spreadsheet_name'])
 
-                # --- 데이터를 안전하게 불러오는 내부 함수 정의 ---
                 def load_sheet_safely(worksheet_name):
                     worksheet = spreadsheet.worksheet(worksheet_name)
                     all_values = worksheet.get_all_values()
-
-                    # 시트가 비어있거나 헤더만 있는 경우, 빈 데이터프레임 반환
-                    if not all_values or len(all_values) < 2:
-                        return pd.DataFrame()
-
+                    if not all_values or len(all_values) < 2: return pd.DataFrame()
                     header = all_values[0]
                     data = all_values[1:]
-
                     df = pd.DataFrame(data, columns=header)
-
-                    # 문제가 되는 빈 헤더('')를 가진 열을 완전히 제거
-                    if '' in df.columns:
-                        df = df.drop(columns=[''])
+                    if '' in df.columns: df = df.drop(columns=[''])
                     return df
 
-                # 1. '기업 정보' 시트 로딩
                 self.company_df = load_sheet_safely(self.paths['company_sheet_name'])
                 if '기업ID' in self.company_df.columns: self.company_df['기업ID'] = self.company_df['기업ID'].astype(
                     str).str.strip().str.lower()
                 print(f"--- '기업 정보' 로딩 완료: {len(self.company_df)}개 기업 ---")
-
-                # 2. '기업리뷰' 시트 로딩
                 self.review_df = load_sheet_safely("기업리뷰")
                 if '평점' in self.review_df.columns: self.review_df['평점'] = pd.to_numeric(self.review_df['평점'],
                                                                                         errors='coerce')
                 print(f"--- '기업리뷰' 로딩 완료: {len(self.review_df)}개 리뷰 ---")
-
-                # 3. '선호분야' 시트 로딩
                 self.preference_df = load_sheet_safely("선호분야")
                 if '평점' in self.preference_df.columns: self.preference_df['평점'] = pd.to_numeric(
                     self.preference_df['평점'], errors='coerce')
                 print(f"--- '선호분야' 로딩 완료: {len(self.preference_df)}개 평가 ---")
-
-                return  # 성공 시 함수 종료
-
+                return
             except gspread.exceptions.APIError as e:
                 if e.response.status_code == 503 and attempt < MAX_RETRIES - 1:
                     print(f"경고: Google API 503 오류. {RETRY_DELAY}초 후 재시도... ({attempt + 1}/{MAX_RETRIES})")
                     time.sleep(RETRY_DELAY)
                 else:
-                    messagebox.showerror("구글 시트 오류", f"데이터 로드 실패 (API 오류):\n{e}")
-                    return
+                    messagebox.showerror("구글 시트 오류", f"데이터 로드 실패 (API 오류):\n{e}"); return
             except Exception as e:
-                messagebox.showerror("구글 시트 오류", f"데이터 로드 실패:\n{e}")
-                return
+                messagebox.showerror("구글 시트 오류", f"데이터 로드 실패:\n{e}"); return
+
+    def get_reviews_by_type(self, company_name):
+        if self.review_df is None or self.review_df.empty: return pd.DataFrame(), pd.DataFrame()
+        all_internal_companies = self.company_df['기업명'].unique().tolist()
+        target_reviews_df = self.review_df[self.review_df['기업명'] == company_name].copy()
+        external_reviews = target_reviews_df[~target_reviews_df['평가기관'].isin(all_internal_companies)]
+        peer_reviews = target_reviews_df[target_reviews_df['평가기관'].isin(all_internal_companies)].copy()
+        if not peer_reviews.empty:
+            unique_reviewers = peer_reviews['평가기관'].unique()
+            reviewer_map = {name: f"입주기업 {i + 1}" for i, name in enumerate(unique_reviewers)}
+            peer_reviews['평가기관'] = peer_reviews['평가기관'].map(reviewer_map)
+        return external_reviews, peer_reviews
+
+    def get_preference_summary(self, company_name):
+        if self.preference_df is None or self.preference_df.empty: return []
+        company_prefs_df = self.preference_df[self.preference_df['평가기업명'] == company_name]
+        if company_prefs_df.empty: return []
+        summary_list = []
+        for target_institution, group in company_prefs_df.groupby('평가대상기관'):
+            if group.empty: continue
+            total_reviews, positive_count = len(group), len(group[group['평점'] >= 4])
+            positive_ratio = (positive_count / total_reviews) * 100 if total_reviews > 0 else 0
+            summary_list.append(f"{company_name}은(는) '{target_institution}'과의 협업을 {positive_ratio:.0f}% 긍정적으로 평가했습니다.")
+        return summary_list
+
+    def summarize_reviews(self, reviews_df, reviewer_type, target_company_name):
+        if reviews_df.empty: return []
+        summary_list = []
+        if reviewer_type == '외부기관':
+            for evaluator, group in reviews_df.groupby('평가기관'):
+                if group.empty: continue
+                positive_count, total_count, avg_score = len(group[group['평점'] >= 4]), len(group), group['평점'].mean()
+                ratio = (positive_count / total_count) * 100 if total_count > 0 else 0
+                summary_list.append(
+                    f"'{evaluator}'의 {ratio:.0f}%가 '{target_company_name}'을(를) 긍정적으로 평가하며, 평균 점수는 {avg_score:.1f}점입니다 (5점 만점).")
+        elif reviewer_type == '입주기업':
+            positive_count, total_count, avg_score = len(reviews_df[reviews_df['평점'] >= 4]), len(reviews_df), \
+            reviews_df['평점'].mean()
+            ratio = (positive_count / total_count) * 100 if total_count > 0 else 0
+            summary_list.append(
+                f"'입주기업'들의 {ratio:.0f}%가 '{target_company_name}'을(를) 긍정적으로 평가하며, 평균 점수는 {avg_score:.1f}점입니다 (5점 만점).")
+        return summary_list
+
+    def judge_sentiment_by_rating(self, rating):
+        try:
+            return "긍정 😊" if float(rating) >= 4 else "중립 😐" if float(rating) >= 3 else "부정 😠"
+        except (ValueError, TypeError):
+            return "정보 없음"
+
+    def get_tourist_spots_in_busan(self):
+        all_spots, seen_titles, content_type_ids = [], set(), ['12', '14', '28', '38']
+        print(f"\n--- 부산 관광정보 수집 시작 (타입: {content_type_ids}) ---")
+        for content_type_id in content_type_ids:
+            try:
+                params = {'serviceKey': self.KOREA_TOUR_API_KEY, 'numOfRows': 500, 'pageNo': 1, 'MobileOS': 'ETC',
+                          'MobileApp': 'AppTest', '_type': 'json', 'areaCode': 6, 'contentTypeId': content_type_id}
+                response = requests.get(self.KOREA_TOUR_API_URL, params=params, timeout=15)
+                if response.status_code != 200: print(
+                    f"  - API 오류: 타입 ID={content_type_id}, 상태 코드={response.status_code}"); continue
+                items = response.json().get('response', {}).get('body', {}).get('items', {}).get('item', [])
+                if items:
+                    count = 0
+                    for item in items:
+                        title = item.get('title')
+                        if title and title not in seen_titles: seen_titles.add(title); all_spots.append(
+                            {'title': title, 'addr1': item.get('addr1', '')}); count += 1
+                    print(f"  - 타입 ID '{content_type_id}'에서 {count}개의 신규 장소 추가됨")
+            except Exception as e:
+                print(f"  - API 요청/처리 실패 (타입 ID: {content_type_id}): {e}"); continue
+        print(f"--- 총 {len(all_spots)}개의 고유한 관광지 정보를 수집했습니다. ---")
+        return all_spots
+
+    def get_google_place_id_via_serpapi(self, spot_name):
+        precise_query = f"{spot_name}, 부산"
+        print(f"\n--- Google Place ID 탐색 시작 (정밀 검색어: '{precise_query}') ---")
+        try:
+            print("  - [1단계] Knowledge Panel에서 Place ID를 탐색합니다.")
+            params = {"engine": "google", "q": precise_query, "api_key": self.SERPAPI_API_KEY, "hl": "ko"}
+            results = GoogleSearch(params).get_dict()
+            if "knowledge_graph" in results and results.get("knowledge_graph", {}).get("place_id"):
+                place_id = results["knowledge_graph"]["place_id"]
+                print(f"  - 성공 (Knowledge Panel): Place ID '{place_id}'를 찾았습니다.")
+                return place_id
+            print("  - 정보: Knowledge Panel에서 Place ID를 찾지 못했습니다. 2단계로 넘어갑니다.")
+        except Exception as e:
+            print(f"  - 경고: Knowledge Panel 탐색 중 오류 발생 ({e}). 2단계로 넘어갑니다.")
+        try:
+            print("  - [2단계] Google Maps API에서 Place ID를 탐색합니다.")
+            params = {"engine": "google_maps", "q": precise_query, "api_key": self.SERPAPI_API_KEY, "hl": "ko"}
+            results = GoogleSearch(params).get_dict()
+            if "local_results" in results and results["local_results"] and results["local_results"][0].get("place_id"):
+                place_id = results["local_results"][0]["place_id"]
+                print(f"  - 성공 (Maps Local): Place ID '{place_id}'를 찾았습니다.")
+                return place_id
+            if "place_results" in results and results.get('place_results', {}).get("place_id"):
+                place_id = results['place_results']["place_id"]
+                print(f"  - 성공 (Maps Place): Place ID '{place_id}'를 찾았습니다.")
+                return place_id
+            print(f"  - 최종 실패: API 응답에서 유효한 Place ID를 찾지 못했습니다.");
+            return None
+        except Exception as e:
+            print(f"  - 최종 실패: Maps API 탐색 중 예외 발생: {e}"); return None
+
+    def get_google_reviews_via_serpapi(self, place_id, review_count=50):
+        print(f"\n--- Google 리뷰 수집 시작 (Place ID: {place_id}, 목표 개수: {review_count}) ---")
+        if not place_id: print("  - 오류: Place ID가 없어 리뷰를 수집할 수 없습니다."); return []
+        all_reviews_data, search = [], GoogleSearch(
+            {"engine": "google_maps_reviews", "place_id": place_id, "hl": "ko", "api_key": self.SERPAPI_API_KEY})
+        while True:
+            try:
+                results = search.get_dict()
+                if "error" in results: print(f"  - SerpApi 오류 발생: {results['error']}"); break
+                reviews = results.get("reviews", [])
+                if reviews:
+                    all_reviews_data.extend(reviews); print(
+                        f"  - 리뷰 {len(reviews)}개를 추가했습니다. (총 {len(all_reviews_data)}개 수집)")
+                else:
+                    print("  - 현재 페이지에 더 이상 리뷰가 없어 수집을 중단합니다."); break
+                if len(all_reviews_data) >= review_count: print(f"  - 목표 리뷰 개수({review_count}개) 이상을 수집하여 종료합니다."); break
+                pagination = results.get("serpapi_pagination")
+                if pagination and "next_page_token" in pagination:
+                    print("  -> 다음 페이지가 존재합니다. 계속 진행합니다."); search.params_dict['next_page_token'] = pagination[
+                        'next_page_token']
+                else:
+                    print("  -> 다음 페이지가 없습니다. 리뷰 수집을 완료합니다."); break
+            except Exception as e:
+                print(f"  - 리뷰 수집 중 심각한 예외 발생: {e}"); break
+        return [{'source': 'Google', 'text': r.get('snippet', '')} for r in all_reviews_data[:review_count] if
+                r.get('snippet')]
+
+    def classify_reviews(self, all_reviews):
+        """
+        [최종 수정] 파인튜닝된 AI 모델을 로드하여 리뷰를 분류합니다.
+        """
+        model_path = './my_review_classifier'  # 1단계에서 생성된 모델 폴더
+
+        # 모델 폴더가 없으면, 기존의 키워드 기반 분류를 예비로 실행
+        if not os.path.exists(model_path):
+            print("경고: 학습된 AI 모델을 찾을 수 없습니다. 키워드 기반으로 분류합니다.")
+            return self.classify_reviews_by_keyword(all_reviews)
+
+        print(f"\n--- AI 모델 '{model_path}'를 사용하여 리뷰 분류 시작 ---")
+
+        # 분류할 리뷰 텍스트만 리스트로 추출
+        review_texts = [review.get('text', '') for review in all_reviews if review.get('text', '').strip()]
+        if not review_texts:
+            return []
+
+        # 분류 파이프라인 생성 (GPU가 있으면 자동으로 사용)
+        classifier = pipeline('text-classification', model=model_path, device=0 if torch.cuda.is_available() else -1)
+
+        # AI 모델로 모든 리뷰를 한 번에 예측
+        predictions = classifier(review_texts)
+
+        # 원래 리뷰 데이터와 예측된 카테고리를 합치기
+        classified_results = []
+        pred_idx = 0
+        for review_data in all_reviews:
+            text = review_data.get('text', '')
+            if text.strip():
+                # AI가 예측한 카테고리('label')를 할당
+                category = predictions[pred_idx]['label']
+                pred_idx += 1
+            else:
+                category = '기타'  # 내용이 없는 리뷰는 '기타'로 처리
+
+            classified_results.append({
+                'review': text,
+                'source': review_data.get('source', '알 수 없음'),
+                'category': category
+            })
+
+        print("--- AI 기반 리뷰 분류 완료 ---")
+        return classified_results
+
+    def classify_reviews_by_keyword(self, all_reviews, model, category_embeddings, threshold=0.4):
+        from sentence_transformers import util
+        classified_results = []
+        for review_data in all_reviews:
+            review_text = review_data.get('text', '')
+            if not review_text.strip(): continue
+            review_embedding = model.encode(review_text, convert_to_tensor=True)
+            scores = {cat: util.cos_sim(review_embedding, emb).max().item() for cat, emb in category_embeddings.items()}
+            best_category = max(scores, key=scores.get) if scores and scores[
+                max(scores, key=scores.get)] >= threshold else '기타'
+            classified_results.append(
+                {'review': review_text, 'source': review_data.get('source', '알 수 없음'), 'category': best_category})
+        return classified_results
+
+    def classify_all_companies(self, model, category_embeddings):
+        from sentence_transformers import util
+        if self.company_df.empty or '사업내용' not in self.company_df.columns: print("--- 기업 정보가 없어 분류를 건너뜁니다. ---"); return
+        print("\n--- 전체 기업 데이터 AI 기반 사전 분류 시작 ---")
+        self.company_df['사업내용'] = self.company_df['사업내용'].fillna('')
+        business_embeddings = model.encode(self.company_df['사업내용'].tolist(), convert_to_tensor=True)
+        categories, scores = [], []
+        for emb in business_embeddings:
+            sim_scores = {cat: util.cos_sim(emb, cat_emb).max().item() for cat, cat_emb in category_embeddings.items()}
+            if not sim_scores: categories.append('기타'); scores.append(0); continue
+            best_cat = max(sim_scores, key=sim_scores.get)
+            categories.append(best_cat);
+            scores.append(sim_scores[best_cat])
+        self.company_df['best_category'], self.company_df['category_score'] = categories, scores
+        print(f"--- 기업 분류 완료: {len(self.company_df)}개 기업에 카테고리 및 점수 부여 완료 ---")
+
+    def recommend_companies(self, category, top_n=5):
+        if self.company_df.empty or 'best_category' not in self.company_df.columns: return []
+        recommended_df = self.company_df[self.company_df['best_category'] == category].copy()
+        recommended_df.sort_values(by='category_score', ascending=False, inplace=True)
+        return recommended_df.head(top_n)['기업명'].tolist()
 
     # --- 기존의 상세 리뷰/감성분석/요약 메서드 ---
     def get_detailed_reviews_for_company(self, company_id):
@@ -257,7 +442,7 @@ class ReviewAnalyzer:
         all_spots = []
         # 중복된 장소를 title 기준으로 걸러내기 위한 집합
         seen_titles = set()
-        content_type_ids = ['12' , '14' , '28', '38', '39']
+        content_type_ids = ['12' , '14' , '28' , '38']
         print(f"\n--- 부산 관광정보 수집 시작 (타입: {content_type_ids}) ---")
 
         for content_type_id in content_type_ids:
@@ -519,6 +704,221 @@ class ReviewAnalyzer:
 
 
 # ------------------- 프론트엔드 UI 페이지들 -------------------
+class AutocompleteEntry(ttk.Entry):
+    """
+    고급 자동완성 기능을 제공하는 ttk.Entry의 확장 위젯.
+    사용자 입력에 따라 Toplevel 팝업으로 제안 목록을 보여줍니다.
+    """
+
+    def __init__(self, parent, controller, *args, **kwargs):
+        # [핵심 수정] 항목 선택 시 호출할 콜백 함수를 인자로 받음
+        self.on_select_callback = kwargs.pop('on_select_callback', None)
+        self.completion_list = kwargs.pop('completion_list', [])
+
+        super().__init__(parent, *args, **kwargs)
+
+        self.controller = controller
+        self.debounce_timer = None
+        self.just_selected = False
+        self.var = self["textvariable"]
+        if self.var == '':
+            self.var = self["textvariable"] = tk.StringVar()
+
+        self.var.trace_add('write', self._debounce_autocomplete)
+
+        self.bind("<FocusOut>", self._hide_popup)
+        self.bind("<Down>", self._move_selection)
+        self.bind("<Up>", self._move_selection)
+        self.bind("<Return>", self._select_item)
+        self.bind("<Escape>", self._hide_popup)
+
+        self._popup_window = tk.Toplevel(controller)
+        self._popup_window.overrideredirect(True)
+        self._popup_window.transient(controller)
+        self._popup_window.withdraw()
+
+        self._listbox = tk.Listbox(self._popup_window, font=("Helvetica", 11), selectmode=tk.SINGLE,
+                                   exportselection=False, highlightthickness=0)
+        self._listbox.pack(expand=True, fill='both')
+        self._listbox.bind("<Button-1>", self._select_item)
+        self._listbox.bind("<<ListboxSelect>>", lambda e: self.focus_set())
+
+    def set_completion_list(self, new_list):
+        self.completion_list = new_list
+
+    def _debounce_autocomplete(self, *args):
+        if self.just_selected:
+            self.just_selected = False
+            return
+        if self.debounce_timer:
+            self.after_cancel(self.debounce_timer)
+        self.debounce_timer = self.after(300, self._show_autocomplete)
+
+    def _show_autocomplete(self):
+        typed_text = self.var.get().lower().strip()
+        if not typed_text:
+            self._hide_popup();
+            return
+        filtered_list = [item for item in self.completion_list if typed_text in item.lower()]
+        if not filtered_list:
+            self._hide_popup();
+            return
+
+        self._listbox.delete(0, tk.END)
+        for item in filtered_list: self._listbox.insert(tk.END, item)
+
+        x, y, width = self.winfo_rootx(), self.winfo_rooty() + self.winfo_height() + 2, self.winfo_width()
+        list_height = min(len(filtered_list), 10)
+        height = self._listbox.size() * 24 if self._listbox.size() <= list_height else list_height * 24
+        self._popup_window.geometry(f"{width}x{height}+{x}+{y}")
+        if not self._popup_window.winfo_viewable(): self._popup_window.deiconify()
+
+        self._listbox.selection_clear(0, tk.END);
+        self._listbox.selection_set(0);
+        self._listbox.see(0)
+
+    def _hide_popup(self, event=None):
+        self._popup_window.withdraw()
+
+    def _select_item(self, event=None):
+        """[핵심 수정] 항목 선택 후, 포커스를 위젯 밖으로 빼고 콜백을 호출합니다."""
+        selected_indices = self._listbox.curselection()
+        if not selected_indices:
+            self._hide_popup()
+            return "break"
+
+        value = self._listbox.get(selected_indices[0])
+        self.just_selected = True
+        self.var.set(value)
+        self._hide_popup()
+
+        # [수정] 더 이상 self.focus_set()을 호출하지 않음
+
+        # [추가] 콜백 함수가 있으면 호출하여 포커스를 이동시킴
+        if self.on_select_callback:
+            self.on_select_callback()
+
+        return "break"
+
+    def _move_selection(self, event):
+        if not self._popup_window.winfo_viewable(): return "break"
+        current_selection, size = self._listbox.curselection(), self._listbox.size()
+        if not current_selection:
+            self._listbox.selection_set(0);
+            return "break"
+        idx = current_selection[0]
+        next_idx = idx + 1 if event.keysym == "Down" else idx - 1
+        if 0 <= next_idx < size:
+            self._listbox.selection_clear(0, tk.END);
+            self.after(10, lambda: self._listbox.selection_set(next_idx));
+            self._listbox.see(next_idx)
+        return "break"
+
+
+class TouristSearchPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        header_frame = tk.Frame(self)
+        header_frame.pack(fill='x', pady=10, padx=10)
+        tk.Button(header_frame, text="< 시작 화면으로", command=lambda: controller.show_frame("StartPage")).pack(side='left')
+
+        tk.Label(self, text="분석할 관광지 이름을 입력하거나, 아래 목록에서 선택하세요.", font=("Helvetica", 14)).pack(pady=10)
+
+        # 1. 자동완성 입력창
+        input_frame = tk.Frame(self)
+        input_frame.pack(pady=5, padx=20, fill='x')
+        tk.Label(input_frame, text="관광지 이름:", font=("Helvetica", 12)).pack(side='left', padx=(0, 5))
+
+        # [핵심 수정] 생성 시 on_select_callback 인자로 포커스 이동 함수를 전달
+        self.spot_entry = AutocompleteEntry(input_frame, controller,
+                                            font=("Helvetica", 12),
+                                            completion_list=[],
+                                            on_select_callback=self._focus_on_analyze_button)
+        self.spot_entry.pack(side='left', expand=True, fill='x')
+
+        # 2. 전체 목록 리스트박스
+        list_frame = tk.Frame(self)
+        list_frame.pack(pady=10, padx=20, fill='both', expand=True)
+        list_scrollbar = tk.Scrollbar(list_frame, orient="vertical")
+        self.listbox = tk.Listbox(list_frame, font=("Helvetica", 11), yscrollcommand=list_scrollbar.set)
+        list_scrollbar.config(command=self.listbox.yview)
+        list_scrollbar.pack(side="right", fill="y")
+        self.listbox.pack(side="left", fill="both", expand=True)
+        self.listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
+
+        # 3. 분석 컨트롤
+        analysis_control_frame = tk.Frame(self)
+        analysis_control_frame.pack(pady=10, padx=20)
+        tk.Label(analysis_control_frame, text="Google 리뷰 수:", font=("Helvetica", 11)).pack(side='left')
+        self.review_count_var = tk.StringVar()
+        review_count_combo = ttk.Combobox(analysis_control_frame, textvariable=self.review_count_var,
+                                          values=[10, 20, 50, 100, 200], width=5, font=("Helvetica", 11),
+                                          state="readonly")
+        review_count_combo.set(50)
+        review_count_combo.pack(side='left', padx=(0, 20))
+        self.analyze_button = tk.Button(analysis_control_frame, text="분석 시작", font=("Helvetica", 14, "bold"),
+                                        command=self.start_analysis)
+        self.analyze_button.pack(side='left')
+
+        # 4. 하단 상태 표시줄
+        status_frame = tk.Frame(self)
+        status_frame.pack(fill='x', padx=20, pady=(5, 10), side='bottom')
+        self.status_label = tk.Label(status_frame, text="", font=("Helvetica", 10))
+        self.status_label.pack()
+        self.progress_bar = ttk.Progressbar(status_frame, orient='horizontal', mode='determinate')
+
+    def _focus_on_analyze_button(self):
+        """[핵심 추가] '분석 시작' 버튼으로 키보드 포커스를 이동시키는 콜백 함수."""
+        self.analyze_button.focus_set()
+
+    def on_listbox_select(self, event):
+        selected_indices = self.listbox.curselection()
+        if not selected_indices: return
+        selected_value = self.listbox.get(selected_indices[0])
+        self.spot_entry.var.set(selected_value)
+        # 리스트박스 선택 시에도 포커스를 분석 버튼으로 이동
+        self._focus_on_analyze_button()
+
+    def update_autocomplete_list(self, spot_list):
+        spot_names = sorted([spot['title'] for spot in spot_list if spot and spot.get('title')])
+        self.spot_entry.set_completion_list(spot_names)
+        self.listbox.delete(0, tk.END)
+        for name in spot_names: self.listbox.insert(tk.END, name)
+        self.status_label.config(text=f"상태: 대기 중 ({len(spot_names)}개 관광지 로드 완료)")
+
+    def start_analysis(self):
+        spot_name = self.spot_entry.get()
+        if not spot_name: messagebox.showwarning("입력 오류", "분석할 관광지 이름을 입력해주세요."); return
+        if spot_name not in self.spot_entry.completion_list: messagebox.showwarning("입력 오류",
+                                                                                    "목록에 있는 관광지를 선택하거나 정확히 입력해주세요."); return
+        try:
+            review_count = int(self.review_count_var.get())
+        except (ValueError, TypeError):
+            review_count = 50
+        self.controller.start_full_analysis(spot_name, review_count)
+
+    def analysis_start_ui(self, spot_name):
+        self.status_label.config(text=f"'{spot_name}' 분석을 시작합니다...");
+        self.progress_bar.pack(fill='x', pady=(5, 0));
+        self.analyze_button.config(state='disabled')
+
+    def update_progress_ui(self, value, message):
+        self.progress_bar['value'] = value; self.status_label.config(text=message)
+
+    def analysis_complete_ui(self):
+        self.progress_bar.pack_forget();
+        self.analyze_button.config(state='normal');
+        self.status_label.config(text="분석 완료! 결과 페이지로 이동합니다.");
+        self.spot_entry.delete(0, tk.END)
+
+    def analysis_fail_ui(self, error_message):
+        messagebox.showerror("분석 오류", error_message);
+        self.progress_bar.pack_forget();
+        self.analyze_button.config(state='normal');
+        self.status_label.config(text="분석 실패")
+
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -527,7 +927,6 @@ class StartPage(tk.Frame):
                   command=controller.navigate_to_company_search).pack(pady=15)
         tk.Button(self, text="관광지 검색", font=("Helvetica", 16), width=20, height=3,
                   command=lambda: controller.show_frame("TouristSearchPage")).pack(pady=15)
-
 
 class CompanySearchPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -650,157 +1049,6 @@ class CompanySearchPage(tk.Frame):
         for widget in [self.summary_text, self.detail_text]:
             widget.config(state=tk.DISABLED)
 
-
-class TouristSearchPage(tk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
-        self.spot_names = []  # 전체 관광지 목록을 저장할 리스트
-
-        header_frame = tk.Frame(self)
-        header_frame.pack(fill='x', pady=10, padx=10)
-        tk.Button(header_frame, text="< 시작 화면으로", command=lambda: controller.show_frame("StartPage")).pack(side='left')
-
-        tk.Label(self, text="관광지를 검색하거나, 아래 목록에서 직접 선택하세요.", font=("Helvetica", 14)).pack(pady=5)
-
-        # --- 상단 입력 및 목록 위젯 (기존과 동일) ---
-        input_frame = tk.Frame(self)
-        input_frame.pack(pady=5, padx=20, fill='x')
-        tk.Label(input_frame, text="관광지 이름:", font=("Helvetica", 12)).pack(side='left', padx=(0, 5))
-        self.entry_var = tk.StringVar()
-        self.spot_combo = ttk.Combobox(input_frame, textvariable=self.entry_var, font=("Helvetica", 12))
-        self.spot_combo.pack(side='left', expand=True, fill='x')
-        self.spot_combo.bind('<KeyRelease>', self.check_autocomplete)
-        self.spot_combo.bind('<Button-1>', self.show_full_list_on_click)
-
-        list_frame = tk.Frame(self)
-        list_frame.pack(pady=10, padx=20, fill='x', expand=False)
-        self.listbox = tk.Listbox(list_frame, font=("Helvetica", 12), height=15)
-        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.listbox.yview)
-        self.listbox.config(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        self.listbox.pack(side="left", fill="both", expand=True)
-        self.listbox.insert(tk.END, "  ⏳ 한국관광공사 API에서 목록을 불러오는 중입니다...")
-        self.listbox.config(state='disabled')
-        self.listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
-
-        # --- [수정] 분석 버튼과 리뷰 개수 설정을 함께 담을 프레임 ---
-        analysis_control_frame = tk.Frame(self)
-        analysis_control_frame.pack(pady=(5, 0), padx=20)
-
-        self.analyze_button = tk.Button(analysis_control_frame, text="분석 시작", font=("Helvetica", 14, "bold"),
-                                        command=self.start_analysis)
-        self.analyze_button.pack(side='left', padx=(0, 10))
-
-        # --- [추가] 구글 리뷰 개수 설정 콤보박스 ---
-        tk.Label(analysis_control_frame, text="Google 리뷰 수:", font=("Helvetica", 11)).pack(side='left')
-        self.review_count_var = tk.StringVar()
-        self.review_count_combo = ttk.Combobox(analysis_control_frame, textvariable=self.review_count_var,
-                                               values=[10, 20, 50, 100, 200], width=5, font=("Helvetica", 11),
-                                               state="readonly")
-        self.review_count_combo.set(50)  # 기본값을 50개로 설정
-        self.review_count_combo.pack(side='left')
-
-        # --- 하단 상태 표시줄 (기존과 동일) ---
-        status_frame = tk.Frame(self)
-        status_frame.pack(fill='x', padx=20, pady=(5, 10))
-        self.status_label = tk.Label(status_frame, text="", font=("Helvetica", 10))
-        self.status_label.pack()
-        self.progress_bar = ttk.Progressbar(status_frame, orient='horizontal', mode='determinate')
-
-
-    def update_list_widgets(self, new_list):
-        """콤보박스와 리스트박스를 동시에 업데이트하는 헬퍼 함수"""
-        # 리스트박스 업데이트
-        self.listbox.delete(0, tk.END)
-        for item in new_list:
-            self.listbox.insert(tk.END, item)
-        # 콤보박스 드롭다운 목록 업데이트
-        self.spot_combo['values'] = new_list
-
-    def show_full_list_on_click(self, event):
-        """콤보박스를 클릭했을 때, 드롭다운에 항상 전체 목록을 표시합니다."""
-        # 현재 필터링된 텍스트와 상관없이, 드롭다운 목록을 전체 목록으로 재설정
-        # 이 작업은 tkinter의 기본 드롭다운 이벤트보다 먼저 실행됩니다.
-        self.spot_combo['values'] = self.spot_names
-
-    def update_autocomplete_list(self, spot_list):
-        """컨트롤러로부터 받은 전체 관광지 목록을 저장하고 위젯에 표시"""
-        self.spot_names = sorted([spot['title'] for spot in spot_list if spot and spot.get('title')])
-
-        # [수정] 리스트박스 상태를 정상으로 되돌리고 로딩 메시지 삭제
-        self.listbox.config(state='normal')
-        self.listbox.delete(0, tk.END)
-
-        self.update_list_widgets(self.spot_names)
-        self.status_label.config(text=f"상태: 대기 중 ({len(self.spot_names)}개 관광지 로드 완료)")
-
-    def check_autocomplete(self, event):
-        """사용자 입력에 따라 리스트박스와 드롭다운 목록을 실시간 필터링"""
-        # 방향키, 엔터, Esc 등 기능 키 입력 시에는 자동완성을 실행하지 않음
-        if event.keysym in ("Up", "Down", "Return", "Escape", "Tab"):
-            return
-
-        typed_text = self.entry_var.get().lower()
-
-        # 입력된 텍스트가 있으면 필터링, 없으면 전체 목록을 사용
-        filtered_list = [name for name in self.spot_names if
-                         typed_text in name.lower()] if typed_text else self.spot_names
-
-        # 리스트 위젯들(콤보박스 드롭다운, 리스트박스)을 필터링된 목록으로 업데이트
-        self.update_list_widgets(filtered_list)
-
-        # [수정] 사용자가 글자를 입력했을 때 드롭다운 메뉴를 강제로 표시
-        if typed_text:
-            # after를 사용하여 위젯 업데이트가 끝난 후 이벤트를 발생시켜 안정성을 높임
-            self.after(10, lambda: self.spot_combo.event_generate('<Down>'))
-
-    def on_listbox_select(self, event):
-        """리스트박스에서 항목을 클릭했을 때, 그 값을 위쪽 입력창에 설정"""
-        widget = event.widget
-        selected_indices = widget.curselection()
-        if selected_indices:
-            selected_item = widget.get(selected_indices[0])
-            self.entry_var.set(selected_item)
-
-    def start_analysis(self):
-        spot_name = self.entry_var.get()
-        if not spot_name or spot_name not in self.spot_names:
-            messagebox.showwarning("입력 오류", "목록에 있는 관광지를 정확히 선택해주세요.")
-            return
-
-        # [수정] 콤보박스에서 선택된 리뷰 개수를 가져옵니다.
-        try:
-            review_count = int(self.review_count_var.get())
-        except (ValueError, TypeError):
-            review_count = 50  # 오류 발생 시 기본값 50으로 설정
-
-        # 컨트롤러의 분석 시작 함수에 리뷰 개수를 함께 전달합니다.
-        self.controller.start_full_analysis(spot_name, review_count)
-
-    # --- 진행률 표시 UI 제어 함수들 (기존과 동일) ---
-    def analysis_start_ui(self, spot_name):
-        self.status_label.config(text=f"'{spot_name}' 분석을 시작합니다...")
-        # [수정] 프로그레스 바를 status_frame의 하단에 표시
-        self.progress_bar.pack(side='bottom', fill='x', pady=(5, 0))
-        self.analyze_button.config(state='disabled')
-
-    def update_progress_ui(self, value, message):
-        self.progress_bar['value'] = value
-        self.status_label.config(text=message)
-
-    def analysis_complete_ui(self):
-        self.progress_bar.pack_forget()  # 숨기기
-        self.analyze_button.config(state='normal')
-        self.status_label.config(text="분석 완료! 결과 페이지로 이동합니다.")
-
-    def analysis_fail_ui(self, error_message):
-        messagebox.showerror("분석 오류", error_message)
-        self.progress_bar.pack_forget()  # 숨기기
-        self.analyze_button.config(state='normal')
-        self.status_label.config(text="분석 실패")
-
-
 class ResultPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -808,18 +1056,22 @@ class ResultPage(tk.Frame):
 
         # --- 상단 헤더 프레임 ---
         header_frame = tk.Frame(self)
-        header_frame.pack(fill='x', pady=10, padx=10, side='top')  # 명시적으로 위쪽에 고정
+        header_frame.pack(fill='x', pady=10, padx=10, side='top')
+
         tk.Button(header_frame, text="< 관광지 검색으로", command=lambda: controller.show_frame("TouristSearchPage")).pack(
             side='left')
+
         self.title_label = tk.Label(header_frame, text="", font=("Helvetica", 18, "bold"))
         self.title_label.pack(side='left', padx=20)
 
-        # --- [수정] 중앙 정렬을 위한 메인 콘텐츠 프레임 ---
-        # 이 프레임이 남은 공간을 모두 차지하며(expand=True), 그 안의 내용이 중앙에 보이게 됩니다.
+        # '텍스트로 내보내기' 버튼
+        self.export_button = tk.Button(header_frame, text="리뷰 텍스트로 내보내기 💾", command=self.export_reviews_to_txt)
+        self.export_button.pack(side='right', padx=10)
+
+        # --- 메인 콘텐츠 프레임 (스크롤 가능 영역) ---
         main_content_frame = tk.Frame(self)
         main_content_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Canvas와 Scrollbar를 새로운 메인 콘텐츠 프레임 안에配置
         canvas = tk.Canvas(main_content_frame)
         scrollbar = ttk.Scrollbar(main_content_frame, orient="vertical", command=canvas.yview)
         self.scrollable_frame = ttk.Frame(canvas)
@@ -828,40 +1080,73 @@ class ResultPage(tk.Frame):
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-
         canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+    def export_reviews_to_txt(self):
+        """
+        [수정 완료] 'tk.filedialog'가 아닌, 직접 import한 'filedialog'를 사용합니다.
+        """
+        result = self.controller.analysis_result
+        if not result or 'classified_reviews' not in result:
+            messagebox.showwarning("내보내기 오류", "내보낼 분석 결과가 없습니다.")
+            return
+
+        spot_name = result.get('spot_name', 'untitle_reviews')
+        safe_spot_name = "".join([c for c in spot_name if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
+
+        try:
+            # --- ▼▼▼ 바로 이 부분이 수정되었습니다 ▼▼▼ ---
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                initialfile=f"{safe_spot_name}_리뷰.txt",
+                title="리뷰를 텍스트 파일로 저장"
+            )
+            # --- ▲▲▲ 여기까지 수정 완료 ▲▲▲ ---
+
+            if not filepath:
+                return
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(f"--- '{spot_name}' 관광지 리뷰 분석 결과 ---\n\n")
+
+                classified_reviews = result.get('classified_reviews', [])
+                if not classified_reviews:
+                    f.write("수집된 리뷰 데이터가 없습니다.")
+                else:
+                    # 라벨링하기 좋은 형식으로, 리뷰 내용만 한 줄에 하나씩 저장합니다.
+                    for review_data in classified_reviews:
+                        text = review_data.get('review', '').strip()
+                        if text:  # 내용이 있는 리뷰만 저장
+                            f.write(f"{text}\n")
+
+            messagebox.showinfo("저장 완료", f"리뷰를 성공적으로 저장했습니다.\n\n경로: {filepath}")
+
+        except Exception as e:
+            messagebox.showerror("파일 저장 오류", f"파일을 저장하는 중 오류가 발생했습니다:\n{e}")
+
     def update_results(self):
-        # 기존 위젯들을 모두 삭제
         for widget in self.scrollable_frame.winfo_children(): widget.destroy()
 
         result = self.controller.analysis_result
         self.title_label.config(text=f"'{result.get('spot_name', '')}' 분석 결과")
 
-        # --- [수정] 추천 기업 표시 로직 ---
         if result.get('recommended_companies'):
             reco_frame = ttk.LabelFrame(self.scrollable_frame, text=f"🏫 '{result.get('best_category')}' 연관 기업 추천",
                                         padding=10)
             reco_frame.pack(fill='x', padx=10, pady=10, anchor='n')
-
-            # 추천된 기업 목록을 하나씩 버튼으로 만듭니다.
             for company_name in result['recommended_companies']:
-                # 클릭 가능한 링크처럼 보이도록 Label 위젯을 사용
                 company_link = tk.Label(reco_frame, text=f"  - {company_name}",
                                         font=("Helvetica", 12, "underline"), fg="blue", cursor="hand2")
                 company_link.pack(anchor='w', pady=3)
-
-                # Label 클릭 시 컨트롤러의 새 함수를 호출하도록 바인딩
                 company_link.bind("<Button-1>",
                                   lambda event,
                                          name=company_name: self.controller.navigate_to_company_details_from_result(
                                       name))
 
-        # --- 카테고리 분류 결과 표시 로직 (기존과 동일) ---
         cat_frame = ttk.LabelFrame(self.scrollable_frame, text="💬 리뷰 카테고리 분류 결과", padding=10)
         cat_frame.pack(fill='x', padx=10, pady=10, anchor='n')
         category_counts = Counter(r['category'] for r in result['classified_reviews'])
@@ -874,7 +1159,6 @@ class ResultPage(tk.Frame):
     def show_details(self, category):
         self.controller.frames["DetailPage"].update_details(category)
         self.controller.show_frame("DetailPage")
-
 
 class DetailPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -1016,7 +1300,8 @@ class TouristApp(tk.Tk):
 
             # 2단계: AI 모델 로딩
             self.after(0, update_popup, 50, f"AI 분석 모델 로딩 중... (장치: {self.device})")
-            from sentence_transformers import SentenceTransformer, util
+            from sentence_transformers import sentencetransformers, util
+            from transformers import pipeline
             self.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask', device=self.device)
             self.category_embeddings = {cat: self.sbert_model.encode(kw, convert_to_tensor=True) for cat, kw in
                                         self.analyzer.CATEGORIES.items()}
