@@ -257,7 +257,7 @@ class ReviewAnalyzer:
         all_spots = []
         # 중복된 장소를 title 기준으로 걸러내기 위한 집합
         seen_titles = set()
-        content_type_ids = ['12']
+        content_type_ids = ['12' , '14' , '28', '38', '39']
         print(f"\n--- 부산 관광정보 수집 시작 (타입: {content_type_ids}) ---")
 
         for content_type_id in content_type_ids:
