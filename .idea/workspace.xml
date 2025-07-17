@@ -34,27 +34,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.debug.executor": "Debug",
-    "Python.dpv.executor": "Run",
-    "Python.git.executor": "Run",
-    "Python.git2.executor": "Run",
-    "Python.main_app.executor": "Debug",
-    "Python.main_app2.executor": "Debug",
-    "Python.test.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main 병합 중",
-    "last_opened_file_path": "/Users/ezra/Desktop/my-crawling-project",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "inlay.hints",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.debug.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.dpv.executor&quot;: &quot;Run&quot;,
+    &quot;Python.git.executor&quot;: &quot;Run&quot;,
+    &quot;Python.git2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_app.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main_app2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/ezra/Desktop/my-crawling-project&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;inlay.hints&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
       <console-settings module-name="my-crawling-project" sdk-home="$PROJECT_DIR$/venv/bin/python" working-directory="$PROJECT_DIR$">
@@ -77,7 +77,7 @@
       <recent name="$PROJECT_DIR$/back" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.main_app">
     <configuration name="main_app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="my-crawling-project" />
       <option name="ENV_FILES" value="" />
@@ -153,6 +153,7 @@
       <workItem from="1751933042145" duration="5884000" />
       <workItem from="1751955478340" duration="4659000" />
       <workItem from="1751960649110" duration="1413000" />
+      <workItem from="1752452550077" duration="2545000" />
     </task>
     <servers />
   </component>
@@ -187,7 +188,7 @@
     <SUITE FILE_PATH="coverage/my_crawling_project$git2.coverage" NAME="git2 커버리지 결과" MODIFIED="1751507671472" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$main_app2.coverage" NAME="main_app2 커버리지 결과" MODIFIED="1751934005222" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$dpv.coverage" NAME="dpv 커버리지 결과" MODIFIED="1751444762909" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/my_crawling_project$main_app.coverage" NAME="main_app 커버리지 결과" MODIFIED="1752222252836" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/my_crawling_project$main_app.coverage" NAME="main_app 커버리지 결과" MODIFIED="1752455708874" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/my_crawling_project$test.coverage" NAME="test 커버리지 결과" MODIFIED="1751610575266" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
