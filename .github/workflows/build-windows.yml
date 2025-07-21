@@ -18,7 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Python 버전 설정 (사용자님의 개발 환경에 맞춰 3.12로 변경 권장)
+      # 2. Python 버전 설정 (개발 환경과 동일한 3.12 권장)
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -31,33 +31,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. GitHub Secret을 사용하여 Google 인증 JSON 파일 생성 (기존과 동일)
+      # 4. GitHub Secret을 사용하여 Google 인증 JSON 파일 생성
       - name: Create credentials file from secret safely
         shell: python
         run: |
           import os
           import json
-
           credentials_json_string = os.environ.get('GOOGLE_CREDENTIALS')
-          
           if not credentials_json_string:
             raise ValueError("GOOGLE_CREDENTIALS secret is not set or empty.")
-          
           try:
-              json.loads(credentials_json_string)
-              print("Secret is a valid JSON. Writing to file...")
+            json.loads(credentials_json_string)
           except json.JSONDecodeError:
-              print(f"Error: The provided secret is not a valid JSON. Secret starts with: {credentials_json_string[:100]}...")
-              raise
-          
+            print(f"Error: The provided secret is not a valid JSON. Secret starts with: {credentials_json_string[:100]}...")
+            raise
           with open('serene-exchange-438319-r7-1dc9aac8b9cf.json', 'w', encoding='utf-8') as f:
-              f.write(credentials_json_string)
-          
+            f.write(credentials_json_string)
           print("Credentials file created successfully.")
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      # 5. PyInstaller로 실행 파일 빌드
+      # 5. PyInstaller로 실행 파일 빌드 (핵심 수정 부분)
       - name: Build single file executable
         run: |
           pyinstaller --onefile `
@@ -66,6 +60,11 @@ jobs:
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             --add-data "my_review_classifier;my_review_classifier" `
+            --hidden-import "sklearn.utils._cython_blas" `
+            --hidden-import "sklearn.neighbors._typedefs" `
+            --hidden-import "sklearn.neighbors._quad_tree" `
+            --hidden-import "sklearn.tree" `
+            --hidden-import "sklearn.tree._utils" `
             main_app.py
 
       # 6. 빌드된 실행 파일을 아티팩트로 업로드
