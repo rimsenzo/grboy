@@ -1,5 +1,5 @@
 # 워크플로 이름
-name: Build Windows Executable (Ultimate)
+name: Build Windows Executable (Final)
 
 on:
   push:
@@ -14,13 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Python 3.8 버전 유지
-      - name: Set up Python 3.8
+      # --- ▼▼▼ [가장 중요한 최종 수정] Python 버전을 '3.12'로 명시 ▼▼▼ ---
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.12'
           cache: 'pip'
 
+      # 이 부분부터는 이전 답변의 포괄적인 설정을 그대로 유지합니다.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -40,8 +41,7 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      # --- ▼▼▼ [최종 수정] hidden-import를 더 강력한 --collect-all로 교체 ▼▼▼ ---
-      - name: Build single file executable with ultimate settings
+      - name: Build single file executable with comprehensive settings
         run: |
           pyinstaller --onefile `
             --name "TouristAnalyzer" `
@@ -49,12 +49,10 @@ jobs:
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             --add-data "my_review_classifier;my_review_classifier" `
-            # --- AI 관련 라이브러리들을 통째로 포함시켜 모듈 누락 문제를 원천 차단 ---
             --collect-all "transformers" `
             --collect-all "sentence_transformers" `
             --collect-all "tokenizers" `
             --collect-all "safetensors" `
-            # --- Scikit-learn은 여전히 hidden-import가 더 효율적일 수 있음 ---
             --hidden-import "sklearn.utils._cython_blas" `
             --hidden-import "sklearn.neighbors._typedefs" `
             --hidden-import "sklearn.neighbors._quad_tree" `
