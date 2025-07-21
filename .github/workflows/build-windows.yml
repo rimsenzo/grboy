@@ -1,49 +1,53 @@
+# 워크플로 이름
 name: Build Windows Executable
 
+# 워크플로 실행 조건
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ "main" ]  # main 브랜치에 push될 때 실행
+  workflow_dispatch:      # 수동으로 실행 가능
 
+# 워크플로 작업 정의
 jobs:
   build:
+    # 실행 환경: 최신 Windows
     runs-on: windows-latest
 
     steps:
+      # 1. 레포지토리 코드 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.8
+      # 2. Python 버전 설정 (사용자님의 개발 환경에 맞춰 3.12로 변경 권장)
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.12'
+          cache: 'pip' # pip 캐싱으로 설치 속도 향상
 
+      # 3. 의존성 라이브러리 설치
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # [핵심 수정] echo 대신 Python을 사용하여 Secret을 파일로 안전하게 생성합니다.
+      # 4. GitHub Secret을 사용하여 Google 인증 JSON 파일 생성 (기존과 동일)
       - name: Create credentials file from secret safely
         shell: python
         run: |
           import os
           import json
 
-          # GitHub Actions가 Secret을 환경 변수로 전달합니다.
           credentials_json_string = os.environ.get('GOOGLE_CREDENTIALS')
           
           if not credentials_json_string:
             raise ValueError("GOOGLE_CREDENTIALS secret is not set or empty.")
           
-          # 파일에 쓰기 전에 유효한 JSON인지 다시 한번 확인합니다 (선택적이지만 안전함)
           try:
               json.loads(credentials_json_string)
               print("Secret is a valid JSON. Writing to file...")
-          except json.JSONDecodeError as e:
-              print(f"Error: The provided secret is not a valid JSON. Please check the secret value in GitHub settings. Error: {e}")
-              # 처음 몇 글자만 출력하여 디버깅에 도움을 줍니다.
-              print(f"Secret starts with: {credentials_json_string[:100]}...")
+          except json.JSONDecodeError:
+              print(f"Error: The provided secret is not a valid JSON. Secret starts with: {credentials_json_string[:100]}...")
               raise
           
           with open('serene-exchange-438319-r7-1dc9aac8b9cf.json', 'w', encoding='utf-8') as f:
@@ -53,7 +57,7 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      # PowerShell의 줄바꿈 문법(`)을 사용합니다.
+      # 5. PyInstaller로 실행 파일 빌드
       - name: Build single file executable
         run: |
           pyinstaller --onefile `
@@ -61,10 +65,12 @@ jobs:
             --windowed `
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
+            --add-data "my_review_classifier;my_review_classifier" `
             main_app.py
 
+      # 6. 빌드된 실행 파일을 아티팩트로 업로드
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TouristAnalyzer-Windows-Final
+          name: TouristAnalyzer-Windows
           path: dist/TouristAnalyzer.exe
