@@ -65,6 +65,9 @@ jobs:
             --hidden-import "sklearn.neighbors._quad_tree" `
             --hidden-import "sklearn.tree" `
             --hidden-import "sklearn.tree._utils" `
+            --hidden-import "transformers.models" `
+            --hidden-import "transformers.models.gemma3n" `
+            --hidden-import "transformers.pipelines" `
             main_app.py
 
       # 6. 빌드된 실행 파일을 아티팩트로 업로드
