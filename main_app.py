@@ -434,8 +434,8 @@ class ReviewAnalyzer:
 # ------------------- 프론트엔드 UI 위젯 및 페이지들 -------------------
 class AutocompleteEntry(tk.Frame):
     """
-    [개선] 자동완성 Entry와 전체 목록 보기 버튼(▼)을 포함하는 복합 위젯.
-    - 디바운싱, 키보드 탐색, 마우스 클릭, 엔터 키 입력 로직 개선
+    [개선된 버전] 자동완성 Entry와 전체 목록 보기 버튼을 포함하는 복합 위젯.
+    - 디바운싱, 키보드 탐색, 마우스 클릭, 엔터 키 입력, 포커스 관리 기능이 모두 개선되었습니다.
     """
 
     def __init__(self, parent, controller, *args, **kwargs):
@@ -454,13 +454,13 @@ class AutocompleteEntry(tk.Frame):
         self.entry.pack(side='left', expand=True, fill='x')
         self.var = self.entry["textvariable"] = tk.StringVar()
 
-        # 전체 목록 보기 버튼 (Combobox 스타일)
+        # 전체 목록 보기 버튼
         self.arrow_button = ttk.Button(self, text="▼", width=3, command=self._toggle_full_list)
         self.arrow_button.pack(side='right')
 
         # --- 이벤트 바인딩 ---
         self.var.trace_add('write', self._debounce_autocomplete)
-        self.entry.bind("<FocusOut>", self._hide_popup)
+        self.entry.bind("<FocusOut>", self._hide_popup_delayed)
         self.entry.bind("<Down>", self._move_selection)
         self.entry.bind("<Up>", self._move_selection)
         self.entry.bind("<Return>", self._handle_return_key)
@@ -473,9 +473,10 @@ class AutocompleteEntry(tk.Frame):
         self._listbox = tk.Listbox(self._popup_window, font=("Helvetica", 11), selectmode=tk.SINGLE,
                                    exportselection=False, highlightthickness=0)
         self._listbox.pack(expand=True, fill='both')
-        self._listbox.bind("<Button-1>", self._select_item_from_click)
+        # 마우스 클릭으로 항목 선택
+        self._listbox.bind("<ButtonRelease-1>", self._select_item_from_click)
 
-    # --- 외부에서 호출하는 메서드들 ---
+    # --- 공개 메서드들 ---
     def set_completion_list(self, new_list):
         self.completion_list = new_list
 
@@ -497,9 +498,10 @@ class AutocompleteEntry(tk.Frame):
             self._show_autocomplete(show_all=True)
 
     def _debounce_autocomplete(self, *args):
+        """[핵심 기능] 타이핑 랙을 막기 위한 디바운싱을 구현합니다."""
         if self.just_selected: self.just_selected = False; return
         if self.debounce_timer: self.after_cancel(self.debounce_timer)
-        self.debounce_timer = self.after(300, self._show_autocomplete)
+        self.debounce_timer = self.after(300, self._show_autocomplete)  # 300ms 디바운싱
 
     def _show_autocomplete(self, show_all=False):
         """팝업에 자동완성 목록을 표시합니다."""
@@ -516,8 +518,10 @@ class AutocompleteEntry(tk.Frame):
         self._listbox.delete(0, tk.END)
         for item in filtered: self._listbox.insert(tk.END, item)
 
-        x, y, w = self.entry.winfo_rootx(), self.entry.winfo_rooty() + self.entry.winfo_height() + 2, self.entry.winfo_width() + self.arrow_button.winfo_width()
+        x, y = self.entry.winfo_rootx(), self.entry.winfo_rooty() + self.entry.winfo_height() + 2
+        w = self.entry.winfo_width() + self.arrow_button.winfo_width()
         h = self._listbox.size() * 24 if self._listbox.size() <= 10 else 240
+
         self._popup_window.geometry(f"{w}x{h}+{x}+{y}")
         if not self._popup_window.winfo_viewable(): self._popup_window.deiconify()
         self._listbox.selection_set(0);
@@ -526,73 +530,59 @@ class AutocompleteEntry(tk.Frame):
     def _hide_popup(self, event=None):
         if self._popup_window.winfo_viewable():
             self._popup_window.withdraw()
-            # ▼▼▼ [중요!] 포커스 복원 ▼▼▼
-            try:
-                if hasattr(self.controller, "focus_force"):
-                    self.controller.focus_force()
-                else:
-                    self.entry.focus_set()
-            except Exception:
-                pass
+
+    def _hide_popup_delayed(self, event=None):
+        """포커스가 다른 위젯으로 이동할 때 팝업을 닫습니다."""
+        self.after(150, self._hide_popup)
 
     def _handle_return_key(self, event=None):
-        """엔터 키 입력 시, 팝업이 보이면 항목을 선택하고, 안 보이면 다음 동작으로 넘어갑니다."""
+        """엔터 키 입력 시 항목을 선택합니다."""
         if self._popup_window.winfo_viewable():
             self._select_item_from_key()
-        else:
-            # 팝업이 안 보일 때는 콜백을 직접 호출 (예: '분석 시작' 버튼으로 포커스 이동)
-            if self.on_select_callback:
-                self.on_select_callback()
+        elif self.on_select_callback:
+            self.on_select_callback()
         return "break"
 
     def _select_item_from_click(self, event):
-        """[개선] 마우스 클릭으로 항목을 선택합니다."""
+        """마우스 클릭으로 항목을 선택합니다."""
         indices = self._listbox.curselection()
-        # 클릭 시점에는 curselection이 불안정할 수 있으므로, y좌표로 인덱스를 계산합니다.
-        if not indices:
-            idx = self._listbox.nearest(event.y)
-            if 0 <= idx < self._listbox.size():
-                indices = (idx,)
-
-        if indices:
-            self._finalize_selection(indices[0])
+        if indices: self._finalize_selection(indices[0])
 
     def _select_item_from_key(self):
-        """[개선] 키보드(엔터)로 항목을 선택합니다."""
+        """키보드(엔터)로 항목을 선택합니다."""
         indices = self._listbox.curselection()
-        if indices:
-            self._finalize_selection(indices[0])
+        if indices: self._finalize_selection(indices[0])
 
     def _finalize_selection(self, index):
-        """선택된 항목으로 값을 설정하고 팝업을 닫는 공통 로직"""
+        """[핵심 기능] 선택된 항목으로 값을 설정하고, 포커스를 되돌려 UI 먹통을 방지합니다."""
         value = self._listbox.get(index)
-        self.just_selected = True
+        self.just_selected = True  # 콜백 실행 중 불필요한 재검색 방지
         self.var.set(value)
         self._hide_popup()
+
+        # 메인 윈도우로 포커스를 강제로 되돌려줍니다.
+        self.controller.focus_force()
+
         if self.on_select_callback:
             self.on_select_callback()
-        # ▼▼▼ [중요!] 메인 윈도우 포커스 복원 ▼▼▼
-        try:
-            if hasattr(self.controller, "focus_force"):
-                self.controller.focus_force()
-            else:
-                self.entry.focus_set()
-        except Exception:
-            pass
 
     def _move_selection(self, event):
         """키보드 방향키로 팝업 내 선택 항목을 이동합니다."""
         if not self._popup_window.winfo_viewable(): return "break"
-        indices, size = self.listbox.curselection(), self._listbox.size()
-        if not indices:
-            self._listbox.selection_set(0);
-            return "break"
+        indices = self._listbox.curselection()
+        size = self._listbox.size()
 
-        idx = indices[0] + (1 if event.keysym == "Down" else -1)
-        if 0 <= idx < size:
+        if not indices:
+            current_idx = -1
+        else:
+            current_idx = indices[0]
+
+        next_idx = current_idx + (1 if event.keysym == "Down" else -1)
+
+        if 0 <= next_idx < size:
             self._listbox.selection_clear(0, tk.END)
-            self._listbox.selection_set(idx);
-            self._listbox.see(idx)
+            self._listbox.selection_set(next_idx);
+            self._listbox.see(next_idx)
         return "break"
 
 
@@ -896,7 +886,7 @@ class DetailPage(tk.Frame):
 class TouristApp(tk.Tk):
     def __init__(self, api_keys, paths):
         super().__init__()
-        self.withdraw()
+        self.withdraw()  # 로딩 중 메인 윈도우 숨기기
         self.title("관광-기업 연계 분석기");
         self.geometry("800x650")
         font.nametofont("TkDefaultFont").configure(family="Helvetica", size=12)
@@ -923,22 +913,30 @@ class TouristApp(tk.Tk):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self.show_frame("StartPage")
+        # UI가 렌더링될 시간을 준 후, 로딩 팝업을 띄우고 백그라운드 작업을 시작합니다.
         self.after(100, self.show_popup_and_prepare_loading)
 
     def show_popup_and_prepare_loading(self):
+        """로딩 팝업을 생성하고, 리소스 로딩 스레드를 시작합니다."""
         self.create_loading_popup()
+        # 팝업이 확실히 그려진 후 스레드를 시작하도록 짧은 딜레이를 줍니다.
         self.after(50, self.load_initial_resources)
 
     def create_loading_popup(self):
-        self.loading_popup = tk.Toplevel(self);
+        """시각적으로 보기 좋은 로딩 팝업창을 생성합니다."""
+        self.loading_popup = tk.Toplevel(self)
         self.loading_popup.title("로딩 중")
-        self.loading_popup.resizable(False, False);
+        self.loading_popup.resizable(False, False)
+        # 사용자가 닫지 못하게 설정
         self.loading_popup.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.loading_popup.transient(self);
+        # 메인 창 위에 항상 떠 있도록 설정
+        self.loading_popup.transient(self)
         self.loading_popup.grab_set()
 
+        # 화면 중앙에 위치시키기
         w, h = 400, 150
-        x, y = (self.winfo_screenwidth() // 2) - (w // 2), (self.winfo_screenheight() // 2) - (h // 2)
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
         self.loading_popup.geometry(f'{w}x{h}+{x}+{y}')
 
         tk.Label(self.loading_popup, text="프로그램을 준비하고 있습니다...", font=("Helvetica", 14, "bold")).pack(pady=20)
@@ -947,29 +945,37 @@ class TouristApp(tk.Tk):
         self.loading_progress_bar = ttk.Progressbar(self.loading_popup, orient='horizontal', length=300,
                                                     mode='determinate')
         self.loading_progress_bar.pack(pady=10)
-        self.loading_popup.update_idletasks()
+        self.loading_popup.update_idletasks()  # 팝업 즉시 그리기
 
     def close_loading_popup(self):
+        """로딩 팝업을 닫고 메인 윈도우를 활성화합니다."""
         if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
-            self.loading_popup.grab_release();
+            self.loading_popup.grab_release()
             self.loading_popup.destroy()
-        self.deiconify();
-        self.lift();
+        # 숨겨뒀던 메인 윈도우를 보여주고 포커스를 줍니다.
+        self.deiconify()
+        self.lift()
         self.focus_force()
 
     def load_initial_resources(self):
+        """백그라운드 스레드를 시작하여 리소스를 로드합니다."""
         threading.Thread(target=self._load_resources_thread, daemon=True).start()
 
     def _load_resources_thread(self):
+        """[백그라운드 실행] 시간이 오래 걸리는 모든 작업을 여기서 처리합니다."""
+
+        # UI 업데이트는 메인 스레드에서 안전하게 실행되도록 self.after를 사용합니다.
         def update_popup(progress, message):
             self.loading_progress_bar['value'] = progress
             self.loading_status_label.config(text=message)
 
         try:
+            # 1단계: 관광지 목록 로딩
             self.after(0, update_popup, 20, "자동완성용 관광지 목록 로딩 중...")
             spots = self.analyzer.get_tourist_spots_in_busan()
             self.frames["TouristSearchPage"].update_autocomplete_list(spots)
 
+            # 2단계: AI 모델 로딩 (지연 import)
             self.after(0, update_popup, 50, f"AI 분석 모델 로딩 중... (장치: {self.device})")
             from sentence_transformers import SentenceTransformer
             self.analyzer.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask', device=self.device)
@@ -977,14 +983,23 @@ class TouristApp(tk.Tk):
                                                  for cat, kw in self.analyzer.CATEGORIES.items()}
             print("--- AI SBERT 모델 및 카테고리 임베딩 로딩 완료 ---")
 
+            # 3단계: 기업 정보 AI 기반 분류
             self.after(0, update_popup, 80, "기업 정보 분석 및 분류 중...")
             self.analyzer.classify_all_companies()
 
             self.after(0, update_popup, 100, "준비 완료!")
+            # 로딩 완료 후 0.5초 뒤 팝업을 닫아 사용자가 완료 메시지를 볼 시간을 줍니다.
             self.after(500, self.close_loading_popup)
         except Exception as e:
             msg = f"프로그램 준비 중 오류가 발생했습니다.\n\n오류: {e}"
+            # 에러 발생 시 안전하게 메인 스레드에서 메시지박스를 띄웁니다.
             self.after(0, self._show_error_message_safely, "초기화 오류", msg)
+
+    def _show_error_message_safely(self, title, message):
+        """메인 스레드에서 안전하게 에러 메시지 팝업을 띄우고 프로그램을 종료합니다."""
+        self.close_loading_popup()
+        messagebox.showerror(title, message)
+        self.destroy()
 
     def start_full_analysis(self, spot_name, review_count):
         threading.Thread(target=self._analysis_thread, args=(spot_name, review_count), daemon=True).start()
