@@ -1,5 +1,5 @@
 # 워크플로 이름
-name: Build Windows Executable (Comprehensive)
+name: Build Windows Executable (Ultimate)
 
 on:
   push:
@@ -14,14 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- ▼▼▼ [가장 중요한 수정] Python 버전을 '3.12'로 명시 ▼▼▼ ---
-      - name: Set up Python 3.12
+      # Python 3.8 버전 유지
+      - name: Set up Python 3.8
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.8'
           cache: 'pip'
 
-      # 이 부분부터는 이전과 동일합니다.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -41,7 +40,8 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      - name: Build single file executable with comprehensive settings
+      # --- ▼▼▼ [최종 수정] hidden-import를 더 강력한 --collect-all로 교체 ▼▼▼ ---
+      - name: Build single file executable with ultimate settings
         run: |
           pyinstaller --onefile `
             --name "TouristAnalyzer" `
@@ -49,27 +49,17 @@ jobs:
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             --add-data "my_review_classifier;my_review_classifier" `
-            --hidden-import "transformers.models" `
-            --hidden-import "transformers.pipelines" `
-            --hidden-import "transformers.models.auto.modeling_auto" `
-            --hidden-import "transformers.models.bert.modeling_bert" `
-            --hidden-import "tokenizers.decoders" `
-            --hidden-import "tokenizers.pre_tokenizers" `
-            --hidden-import "tokenizers.processors" `
-            --hidden-import "sentence_transformers.models" `
-            --hidden-import "sentence_transformers.util" `
-            --hidden-import "sentence_transformers.cross_encoder" `
-            --hidden-import "sentence_transformers.quantization" `
-            --hidden-import "sklearn" `
+            # --- AI 관련 라이브러리들을 통째로 포함시켜 모듈 누락 문제를 원천 차단 ---
+            --collect-all "transformers" `
+            --collect-all "sentence_transformers" `
+            --collect-all "tokenizers" `
+            --collect-all "safetensors" `
+            # --- Scikit-learn은 여전히 hidden-import가 더 효율적일 수 있음 ---
             --hidden-import "sklearn.utils._cython_blas" `
             --hidden-import "sklearn.neighbors._typedefs" `
             --hidden-import "sklearn.neighbors._quad_tree" `
             --hidden-import "sklearn.tree" `
             --hidden-import "sklearn.tree._utils" `
-            --hidden-import "torch" `
-            --hidden-import "torch._C" `
-            --hidden-import "safetensors" `
-            --hidden-import "scipy.special.cython_special" `
             main_app.py
 
       - name: Upload executable artifact
