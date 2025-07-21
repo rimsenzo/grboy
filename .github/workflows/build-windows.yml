@@ -14,13 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Python 3.8 버전을 유지합니다. (단, 개발 환경과 동일하게 맞추는 것이 가장 안정적입니다.)
-      - name: Set up Python 3.8
+      # --- ▼▼▼ [가장 중요한 수정] Python 버전을 '3.12'로 명시 ▼▼▼ ---
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.12'
           cache: 'pip'
 
+      # 이 부분부터는 이전과 동일합니다.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -40,7 +41,6 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      # --- ▼▼▼ [핵심 수정] PyInstaller 빌드 명령어에 포괄적인 hidden-import 추가 ▼▼▼ ---
       - name: Build single file executable with comprehensive settings
         run: |
           pyinstaller --onefile `
@@ -49,7 +49,6 @@ jobs:
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
             --add-data "my_review_classifier;my_review_classifier" `
-            # --- Transformers 및 관련 모델 ---
             --hidden-import "transformers.models" `
             --hidden-import "transformers.pipelines" `
             --hidden-import "transformers.models.auto.modeling_auto" `
@@ -57,19 +56,16 @@ jobs:
             --hidden-import "tokenizers.decoders" `
             --hidden-import "tokenizers.pre_tokenizers" `
             --hidden-import "tokenizers.processors" `
-            # --- Sentence Transformers ---
             --hidden-import "sentence_transformers.models" `
             --hidden-import "sentence_transformers.util" `
             --hidden-import "sentence_transformers.cross_encoder" `
             --hidden-import "sentence_transformers.quantization" `
-            # --- Scikit-learn 및 유틸리티 ---
             --hidden-import "sklearn" `
             --hidden-import "sklearn.utils._cython_blas" `
             --hidden-import "sklearn.neighbors._typedefs" `
             --hidden-import "sklearn.neighbors._quad_tree" `
             --hidden-import "sklearn.tree" `
             --hidden-import "sklearn.tree._utils" `
-            # --- PyTorch 및 기타 백엔드 ---
             --hidden-import "torch" `
             --hidden-import "torch._C" `
             --hidden-import "safetensors" `
