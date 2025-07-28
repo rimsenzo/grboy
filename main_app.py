@@ -502,7 +502,7 @@ class MainPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.main_content_frame = tk.Frame(self)
-        tk.Label(self.main_content_frame, text="관광-기업 연계 분석 시스템", font=("Helvetica", 22, "bold")).pack(pady=50)
+        tk.Label(self.main_content_frame, text="K- 콘텐츠 아카이빙 프로그램", font=("Helvetica", 22, "bold")).pack(pady=50)
         tk.Button(self.main_content_frame, text="기업 분석", font=("Helvetica", 16), width=20, height=3, command=lambda: controller.show_frame("CompanySearchPage")).pack(pady=15)
         tk.Button(self.main_content_frame, text="관광지 분석", font=("Helvetica", 16), width=20, height=3, command=lambda: controller.show_frame("TouristSearchPage")).pack(pady=15)
         tk.Button(self.main_content_frame, text="키워드 검색", font=("Helvetica", 16), width=20, height=3, command=lambda: controller.show_frame("KeywordSearchPage")).pack(pady=15)
