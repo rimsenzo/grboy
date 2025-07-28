@@ -1,5 +1,5 @@
-# === 설치 경로 지정 (CPU 버전 torch를 위함) ===
---index-url https://download.pytorch.org/whl/cpu
+# === [핵심 수정] 설치 경로를 '추가'하도록 변경 ===
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 # === 빌드 도구 (필수) ===
 pyinstaller==6.14.2
@@ -15,7 +15,7 @@ google-search-results==2.4.2
 
 # === AI 모델 및 자연어 처리 ===
 sentence-transformers==5.0.0
-# 위에서 지정한 경로를 통해 CPU 전용 버전이 설치됨
+# 위에서 '추가'한 경로를 통해 CPU 전용 버전이 설치됨
 torch==2.7.1
 transformers==4.53.1
 tokenizers==0.21.2
