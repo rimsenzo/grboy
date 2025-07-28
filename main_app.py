@@ -97,6 +97,7 @@ class ReviewAnalyzer:
         try:
             from sentence_transformers import SentenceTransformer
             import torch
+            model_path = resource_path('jhgan/ko-sroberta-multitask')
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             self.sbert_model = SentenceTransformer('jhgan/ko-sroberta-multitask', device=device)
             self.enterprise_category_embeddings = {cat: self.sbert_model.encode(cat, convert_to_tensor=True) for cat in self.ENTERPRISE_CATEGORIES}

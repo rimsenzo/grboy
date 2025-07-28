@@ -14,20 +14,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- ▼▼▼ [가장 중요한 최종 수정] Python 버전을 '3.12'로 명시 ▼▼▼ ---
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
 
-      # 이 부분부터는 이전 답변의 포괄적인 설정을 그대로 유지합니다.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create credentials file from secret safely
+      # --- ▼ [수정 1] 빌드 전, AI 모델을 미리 다운로드하는 단계 추가 ▼ ---
+      - name: Download SBERT model locally
+        shell: python
+        run: |
+          from sentence_transformers import SentenceTransformer
+          model_name = 'jhgan/ko-sroberta-multitask'
+          print(f"Downloading model: {model_name}")
+          model = SentenceTransformer(model_name)
+          model.save(model_name)
+          print(f"Model saved to './{model_name}' directory.")
+
+      - name: Create credentials file from secret
         shell: python
         run: |
           import os, json
@@ -35,31 +44,41 @@ jobs:
           if not credentials_json_string: raise ValueError("GOOGLE_CREDENTIALS secret is not set.")
           try: json.loads(credentials_json_string)
           except: raise ValueError("Secret is not valid JSON.")
-          with open('serene-exchange-438319-r7-1dc9aac8b9cf.json', 'w', encoding='utf-8') as f:
+          # config.ini에서 파일명을 읽어와 해당 이름으로 생성합니다.
+          # 만약 config.ini가 없거나 설정이 없다면 기본값으로 생성합니다.
+          key_filename = 'serene-exchange-438319-r7-1dc9aac8b9cf.json' # 기본값
+          try:
+            import configparser
+            config = configparser.ConfigParser()
+            if os.path.exists('config.ini'):
+              config.read('config.ini', encoding='utf-8')
+              if 'PATHS' in config and 'google_sheet_key_path' in config['PATHS']:
+                key_filename = config['PATHS']['google_sheet_key_path']
+          except Exception as e:
+            print(f"Warning: Could not read key filename from config.ini, using default. Error: {e}")
+          
+          with open(key_filename, 'w', encoding='utf-8') as f:
             f.write(credentials_json_string)
-          print("Credentials file created successfully.")
+          print(f"Credentials file '{key_filename}' created successfully.")
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
-      - name: Build single file executable with comprehensive settings
+      # --- ▼ [수정 2] PyInstaller 명령어 최적화 ▼ ---
+      - name: Build single file executable with optimized settings
         run: |
           pyinstaller --onefile `
             --name "TouristAnalyzer" `
             --windowed `
             --add-data "config.ini;." `
             --add-data "serene-exchange-438319-r7-1dc9aac8b9cf.json;." `
-            --add-data "my_review_classifier;my_review_classifier" `
+            --add-data "jhgan/ko-sroberta-multitask;jhgan/ko-sroberta-multitask" `
             --collect-all "transformers" `
             --collect-all "sentence_transformers" `
             --collect-all "tokenizers" `
             --collect-all "safetensors" `
-            --hidden-import "sklearn.utils._cython_blas" `
-            --hidden-import "sklearn.neighbors._typedefs" `
-            --hidden-import "sklearn.neighbors._quad_tree" `
-            --hidden-import "sklearn.tree" `
-            --hidden-import "sklearn.tree._utils" `
             main_app.py
 
+      # --- ▼ [수정 3] 아티팩트 이름 명확화 ▼ ---
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
         with:

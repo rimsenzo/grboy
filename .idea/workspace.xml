@@ -5,12 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4a8c8e9a-9456-489f-958c-7550e11160d1" name="변경" comment="final_ver1">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/build-windows.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/build-windows.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.ini" beforeDir="false" afterPath="$PROJECT_DIR$/config.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/debug.py" beforeDir="false" afterPath="$PROJECT_DIR$/debug.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main_app.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_app2.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_app2.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,32 +37,32 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.check_sheet.executor": "Run",
-    "Python.debug.executor": "Run",
-    "Python.dpv.executor": "Run",
-    "Python.git.executor": "Run",
-    "Python.git2.executor": "Run",
-    "Python.main_app.executor": "Debug",
-    "Python.main_app2.executor": "Debug",
-    "Python.merge_data.executor": "Run",
-    "Python.predict_reviews.executor": "Run",
-    "Python.test.executor": "Debug",
-    "Python.train_model.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/ezra/Desktop/my-crawling-project",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.code.analysis.last.selected.profile": "aDefault",
-    "settings.editor.selected.configurable": "inlay.hints",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.check_sheet.executor&quot;: &quot;Run&quot;,
+    &quot;Python.debug.executor&quot;: &quot;Run&quot;,
+    &quot;Python.dpv.executor&quot;: &quot;Run&quot;,
+    &quot;Python.git.executor&quot;: &quot;Run&quot;,
+    &quot;Python.git2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_app.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main_app2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.merge_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.predict_reviews.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.train_model.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/ezra/Desktop/my-crawling-project&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;aDefault&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;inlay.hints&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
       <console-settings module-name="my-crawling-project" sdk-home="$PROJECT_DIR$/venv/bin/python" working-directory="$PROJECT_DIR$">
@@ -87,7 +85,7 @@
       <recent name="$PROJECT_DIR$/back" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.main_app">
     <configuration name="main_app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="my-crawling-project" />
       <option name="ENV_FILES" value="" />
@@ -166,7 +164,8 @@
       <workItem from="1752452550077" duration="2545000" />
       <workItem from="1752710639483" duration="14927000" />
       <workItem from="1753056515161" duration="11548000" />
-      <workItem from="1753076575332" duration="42408000" />
+      <workItem from="1753076575332" duration="42653000" />
+      <workItem from="1753660464874" duration="612000" />
     </task>
     <task id="LOCAL-00001" summary="final_ver1">
       <option name="closed" value="true" />
