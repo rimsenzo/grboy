@@ -374,30 +374,91 @@ class ReviewAnalyzer:
         return None
 
     def get_google_place_id_via_serpapi(self, spot_name):
+        """
+        [최종 버전] 'google_maps' 엔진의 두 가지 응답 유형(단일/목록)을 모두 처리하여
+        안정적으로 ID를 가져옵니다. (이전 답변의 가장 안정적인 버전 유지)
+        """
         try:
-            params = {"engine": "google", "q": f"{spot_name}, 부산", "api_key": self.SERPAPI_API_KEY, "hl": "ko"}
-            results = GoogleSearch(params).get_dict()
-            if "knowledge_graph" in results and "place_id" in results.get("knowledge_graph", {}):
-                return results["knowledge_graph"]["place_id"]
-        except Exception:
-            pass
+            params = {
+                "engine": "google_maps",
+                "q": spot_name,
+                "ll": "@35.158659,129.159986,15z",
+                "api_key": self.SERPAPI_API_KEY,
+                "hl": "ko"
+            }
+            search = GoogleSearch(params)
+            results = search.get_dict()
+
+            if "place_results" in results and results["place_results"].get("place_id"):
+                place_id = results["place_results"]["place_id"]
+                print(f"DEBUG: 'place_results'에서 Place ID를 찾았습니다: {place_id}")
+                return place_id
+
+            if "local_results" in results and results.get("local_results"):
+                place_id = results["local_results"][0].get("place_id")
+                if place_id:
+                    print(f"DEBUG: 'local_results'에서 Place ID를 찾았습니다: {place_id}")
+                    return place_id
+
+        except Exception as e:
+            print(f"SerpApi(google_maps)로 Place ID 검색 중 심각한 오류 발생: {e}")
+
+        print(f"최종 실패: '{spot_name}'의 Place ID를 Google Maps에서 찾지 못했습니다.")
         return None
 
     def get_google_reviews_via_serpapi(self, place_id, review_count=50):
+        """
+        [진짜 최종 버전] 리뷰 내용 키를 'comment'와 'snippet' 모두 확인하도록 수정하여
+        안정성을 대폭 높인 최종 코드입니다.
+        """
+        print(f"\n--- Google 리뷰 수집 시작 (Place ID: {place_id}, 목표 개수: {review_count}) ---")
         if not place_id: return []
-        all_reviews = []
+
+        all_reviews_data = []
         params = {"engine": "google_maps_reviews", "place_id": place_id, "hl": "ko", "api_key": self.SERPAPI_API_KEY}
         search = GoogleSearch(params)
+
         while True:
             try:
                 results = search.get_dict()
-                if "error" in results or not (reviews := results.get("reviews")): break
-                all_reviews.extend(reviews)
-                if len(all_reviews) >= review_count or "next_page_token" not in results.get("serpapi_pagination", {}): break
-                search.params_dict['next_page_token'] = results["serpapi_pagination"]["next_page_token"]
-            except Exception:
+                if "error" in results:
+                    print(f"  - SerpApi 오류: {results['error']}");
+                    break
+
+                reviews = results.get("reviews", [])
+                if not reviews:
+                    print("  - 현재 페이지에 더 이상 리뷰가 없어 수집을 중단합니다.");
+                    break
+
+                all_reviews_data.extend(reviews)
+                print(f"  - 리뷰 {len(reviews)}개 추가 (총 {len(all_reviews_data)}개 수집)")
+
+                if len(all_reviews_data) >= review_count:
+                    print(f"  - 목표 리뷰 개수({review_count}개) 이상 수집 완료.");
+                    break
+
+                pagination = results.get("serpapi_pagination")
+                if pagination and "next_page_token" in pagination:
+                    search.params_dict['next_page_token'] = pagination['next_page_token']
+                else:
+                    print("  -> 다음 페이지 없음. 리뷰 수집 완료.");
+                    break
+            except Exception as e:
+                print(f"  - 리뷰 수집 중 예외 발생: {e}");
                 break
-        return [{'source': 'Google', 'text': r.get('snippet', '')} for r in all_reviews[:review_count] if r.get('snippet')]
+
+        # --- ▼▼▼ [진짜 마지막 핵심 수정] ▼▼▼ ---
+        # API 응답 형식 변화에 모두 대응하기 위해,
+        # 'comment' 키를 먼저 확인하고, 없으면 'snippet' 키를 확인합니다.
+        extracted = []
+        for r in all_reviews_data[:review_count]:
+            review_text = r.get('comment') or r.get('snippet')  # comment가 없으면 snippet을 사용
+            if review_text:  # 내용이 있는 경우에만 추가
+                extracted.append({'source': 'Google', 'text': review_text})
+        # --- ▲▲▲ [진짜 마지막 핵심 수정] ▲▲▲ ---
+
+        print(f"  - 최종적으로 내용이 있는 리뷰 {len(extracted)}개를 추출했습니다.")
+        return extracted
 
     def get_tripadvisor_reviews(self, location_id):
         if not location_id or not self.TRIPADVISOR_API_KEY: return []
