@@ -1,3 +1,6 @@
+# === 빌드 도구 (필수) ===
+pyinstaller==6.14.2
+
 # === 데이터 처리 및 구글 시트 연동 ===
 pandas==2.3.1
 gspread==6.2.1
@@ -14,5 +17,5 @@ transformers==4.53.1
 tokenizers==0.21.2
 safetensors==0.5.3
 
-# === GUI 그래프 (필수 추가) ===
+# === GUI 그래프 (필수) ===
 matplotlib==3.9.1
