@@ -871,7 +871,7 @@ class TouristApp(tk.Tk):
     def __init__(self, api_keys, paths):
         super().__init__()
         self.withdraw()
-        self.title("관광-기업 연계 분석기")
+        self.title("K-콘텐츠 아카이빙 프로그램")
         self.geometry("1200x900")
         self.analyzer = ReviewAnalyzer(api_keys, paths)
         self.analysis_result = {}
